@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}My Reservations · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem">
+    <h1 style="margin:0">My Reservations</h1>
+    <a class="btn" href="{% url 'parking:slots' %}">Book a slot</a>
+  </div>
+</div>
+
+{% if reservations %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Code</th><th>Slot</th><th>When</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for r in reservations %}
+        <tr>
+          <td><strong>{{ r.code }}</strong></td>
+          <td>{{ r.slot.code }} ({{ r.slot.floor.code }})</td>
+          <td>{{ r.start_at|date:"M j, H:i" }}–{{ r.end_at|date:"H:i" }}</td>
+          <td><span class="badge badge--{{ r.status_badge }}">{{ r.get_status_display }}</span></td>
+          <td><a href="{% url 'reservations:detail' r.pk %}">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card center">
+  <p class="muted">You have no reservations yet.</p>
+  <a class="btn" href="{% url 'parking:slots' %}">Find a slot</a>
+</div>
+{% endif %}
+{% endblock %}

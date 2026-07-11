@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Page not found · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow center error-page">
+  <!-- Parking signal — repurposed from the legacy site's traffic-light JS. -->
+  <div class="parking-signal" aria-hidden="true">
+    <span class="signal-light" data-color="red"></span>
+    <span class="signal-light" data-color="amber"></span>
+    <span class="signal-light" data-color="green"></span>
+  </div>
+  <h1 class="card__title">Wrong turn — 404</h1>
+  <p class="muted">The page you're looking for isn't in this parking facility.</p>
+  <div class="form-actions" style="justify-content:center">
+    <a class="btn" href="{% url 'core:home' %}">Back to home</a>
+    <a class="btn btn--ghost" href="{% url 'parking:slots' %}">Find a slot</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="{% static 'js/parking-signal.js' %}"></script>
+{% endblock %}

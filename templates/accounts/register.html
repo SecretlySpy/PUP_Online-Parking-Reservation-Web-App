@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <h1 class="card__title">{{ heading }}</h1>
+  {% if is_admin %}
+    <p class="muted">Administrator accounts manage inventory, reservations, and reports.</p>
+  {% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn--block">Create account</button>
+    </div>
+  </form>
+  <p class="center muted" style="margin-top:1rem">
+    Already registered? <a href="{% url 'accounts:login' %}">Sign in</a>
+  </p>
+</div>
+{% endblock %}

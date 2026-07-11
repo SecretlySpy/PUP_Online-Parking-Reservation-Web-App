@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sign in · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <h1 class="card__title">Sign in</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="form-actions">
+      <button type="submit" class="btn btn--block">Sign in</button>
+    </div>
+  </form>
+  <p class="muted center" style="margin-top:1rem">
+    <a href="{% url 'accounts:password_reset' %}">Forgot password?</a>
+  </p>
+  <p class="center" style="margin-top:.4rem">
+    No account? <a href="{% url 'accounts:register' %}">Register</a>
+  </p>
+</div>
+{% endblock %}

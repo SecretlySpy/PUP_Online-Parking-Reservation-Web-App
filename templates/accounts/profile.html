@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}My Profile · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <div class="profile-head">
+    <img class="avatar" src="{% static 'img/default-avatar.png' %}" alt="Profile avatar" width="72" height="72">
+    <div>
+      <h1 class="card__title" style="margin:0">My Profile</h1>
+      <p class="muted" style="margin:0">Account type: {{ user.get_role_display }} &middot; {{ user.username }}</p>
+    </div>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn">Save changes</button>
+      <a class="btn btn--ghost" href="{% url 'accounts:password_change' %}">Change password</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

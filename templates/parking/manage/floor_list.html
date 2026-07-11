@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Floors · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem">
+    <h1 style="margin:0">Parking floors</h1>
+    <a class="btn" href="{% url 'parking:floor_add' %}">Add floor</a>
+  </div>
+</div>
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Name</th><th>Code</th><th>Order</th><th>Active</th><th>Slots</th><th></th></tr></thead>
+      <tbody>
+        {% for floor in floors %}
+        <tr>
+          <td>{{ floor.name }}</td>
+          <td>{{ floor.code }}</td>
+          <td>{{ floor.sort_order }}</td>
+          <td>{% if floor.is_active %}Yes{% else %}No{% endif %}</td>
+          <td>{{ floor.slots.count }}</td>
+          <td><a href="{% url 'parking:floor_edit' floor.pk %}">Edit</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="muted center">No floors yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

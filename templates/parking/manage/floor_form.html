@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <h1 class="card__title">{{ heading }}</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn">Save</button>
+      <a class="btn btn--ghost" href="{% url 'parking:floor_list' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

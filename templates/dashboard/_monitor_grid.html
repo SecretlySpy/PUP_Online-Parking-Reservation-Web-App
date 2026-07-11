@@ -1,0 +1,18 @@
+<div class="slot-summary">
+  <span class="chip chip--ok">Available</span>
+  <span class="chip" style="background:#fdf5f4;color:#b3261e">Occupied</span>
+  <span class="chip chip--info">Reserved</span>
+  <span class="chip chip--warn">Maintenance</span>
+  <span class="slot-summary__time muted">updated {% now "H:i:s" %}</span>
+</div>
+<div class="slot-grid">
+  {% for slot in slots %}
+    <div class="slot-cell slot-cell--{{ slot.monitor_status }}">
+      <div class="slot-cell__code">{{ slot.code }}</div>
+      <div class="slot-cell__meta">{{ slot.floor.code }} · {{ slot.get_slot_type_display }}</div>
+      <span class="badge badge--{{ slot.monitor_status }}">{{ slot.monitor_status|capfirst }}</span>
+    </div>
+  {% empty %}
+    <p class="muted">No slots.</p>
+  {% endfor %}
+</div>

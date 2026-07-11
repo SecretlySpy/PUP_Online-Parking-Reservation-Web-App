@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Reports · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card"><h1 style="margin:0">Reports</h1></div>
+{% include "dashboard/_nav.html" %}
+
+<div class="stat-row">
+  <div class="stat"><div class="stat__num">{{ slots.total }}</div><div class="stat__label">Total slots</div></div>
+  <div class="stat"><div class="stat__num">{{ slots.available_now }}</div><div class="stat__label">Available now</div></div>
+  <div class="stat"><div class="stat__num">{{ slots.occupied_now }}</div><div class="stat__label">Occupied now</div></div>
+  <div class="stat"><div class="stat__num">{{ revenue_display }}</div><div class="stat__label">Revenue (paid)</div></div>
+</div>
+
+<div class="card">
+  <h3>Slots by floor</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Floor</th><th>Total</th><th>Usable</th><th>Maintenance</th></tr></thead>
+      <tbody>
+        {% for row in floors %}
+        <tr>
+          <td>{{ row.floor.name }} ({{ row.floor.code }})</td>
+          <td>{{ row.total }}</td>
+          <td>{{ row.usable }}</td>
+          <td>{{ row.maintenance }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="muted center">No floors.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid grid--2">
+  <div class="card">
+    <h3>Reservation status totals</h3>
+    <table class="data">
+      <tr><th>Reserved</th><td>{{ reservations.RESERVED }}</td></tr>
+      <tr><th>Occupied</th><td>{{ reservations.OCCUPIED }}</td></tr>
+      <tr><th>Completed</th><td>{{ reservations.COMPLETED }}</td></tr>
+      <tr><th>Cancelled</th><td>{{ reservations.CANCELLED }}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Payment status totals</h3>
+    <table class="data">
+      <tr><th>Paid</th><td>{{ payments.by_status.PAID }}</td></tr>
+      <tr><th>Pending</th><td>{{ payments.by_status.PENDING }}</td></tr>
+      <tr><th>Failed</th><td>{{ payments.by_status.FAILED }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Recent system activity</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for a in activity %}
+        <tr><td>{{ a.created_at|date:"M j, H:i" }}</td><td>{{ a.actor_label }}</td><td><code>{{ a.action }}</code></td><td>{{ a.description }}</td></tr>
+        {% empty %}<tr><td colspan="4" class="muted center">No activity yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

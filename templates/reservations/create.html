@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Modify reservation{% else %}Book slot {{ slot.code }}{% endif %} · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <h1 class="card__title">{% if editing %}Modify reservation{% else %}Reserve slot {{ slot.code }}{% endif %}</h1>
+  <p class="muted">{{ slot.floor.name }} · {{ slot.get_slot_type_display }}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn">{% if editing %}Save changes{% else %}Confirm reservation{% endif %}</button>
+      <a class="btn btn--ghost" href="{% url 'parking:slots' %}">Back to slots</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

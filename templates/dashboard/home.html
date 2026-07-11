@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card"><h1 style="margin:0">Admin Dashboard</h1></div>
+{% include "dashboard/_nav.html" %}
+
+<div class="stat-row">
+  <div class="stat"><div class="stat__num">{{ slots.available_now }}</div><div class="stat__label">Available now</div></div>
+  <div class="stat"><div class="stat__num">{{ slots.occupied_now }}</div><div class="stat__label">Occupied</div></div>
+  <div class="stat"><div class="stat__num">{{ slots.maintenance }}</div><div class="stat__label">Maintenance</div></div>
+  <div class="stat"><div class="stat__num">{{ slots.total }}</div><div class="stat__label">Total slots</div></div>
+</div>
+
+<div class="grid grid--2">
+  <div class="card">
+    <h3>Reservations</h3>
+    <table class="data">
+      <tr><th>Reserved</th><td>{{ reservations.RESERVED }}</td></tr>
+      <tr><th>Occupied</th><td>{{ reservations.OCCUPIED }}</td></tr>
+      <tr><th>Completed</th><td>{{ reservations.COMPLETED }}</td></tr>
+      <tr><th>Cancelled</th><td>{{ reservations.CANCELLED }}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Payments</h3>
+    <p style="font-size:1.6rem;font-weight:800;margin:.2rem 0">{{ revenue_display }}</p>
+    <p class="muted">collected (paid)</p>
+    <table class="data">
+      <tr><th>Paid</th><td>{{ payments.by_status.PAID }}</td></tr>
+      <tr><th>Pending</th><td>{{ payments.by_status.PENDING }}</td></tr>
+      <tr><th>Failed</th><td>{{ payments.by_status.FAILED }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Recent activity</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for a in activity %}
+        <tr>
+          <td>{{ a.created_at|date:"M j, H:i" }}</td>
+          <td>{{ a.actor_label }}</td>
+          <td><code>{{ a.action }}</code></td>
+          <td>{{ a.description }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="muted center">No activity yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

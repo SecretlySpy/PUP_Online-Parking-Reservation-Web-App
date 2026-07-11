@@ -1,0 +1,20 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# Secrets & local env
+.env
+*.local
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated %}
+  <div class="card">
+    <h1 class="card__title">Welcome, {{ user.get_full_name|default:user.username }}</h1>
+    <p class="muted">You're signed in as {{ user.get_role_display }}.</p>
+    <div class="form-actions">
+      <a class="btn" href="{% url 'accounts:profile' %}">My Profile</a>
+      {% if not user.is_admin_role %}
+        <a class="btn btn--ghost" href="{% url 'accounts:vehicles' %}">My Vehicles</a>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  <section class="hero hero--photo" style="--hero-img:url('{% static 'img/hero-parking.jpg' %}')">
+    <h1>Reserve your campus parking slot online</h1>
+    <p>
+      View real-time slot availability, book a space for a specific date and
+      time, and pay your reservation fee online — no more waiting on manual
+      approvals.
+    </p>
+    <div class="hero__actions">
+      <a class="btn" href="{% url 'accounts:register' %}">Get started</a>
+      <a class="btn btn--ghost-light" href="{% url 'parking:facility' %}">Explore the facility</a>
+    </div>
+  </section>
+
+  <div class="grid grid--3">
+    <div class="card">
+      <h3>Real-time availability</h3>
+      <p class="muted">See open slots by floor, vehicle type, date, and time — refreshed automatically.</p>
+    </div>
+    <div class="card">
+      <h3>Instant reservations</h3>
+      <p class="muted">Book on the spot with a unique reservation code and QR for verification on arrival.</p>
+    </div>
+    <div class="card">
+      <h3>Pay online</h3>
+      <p class="muted">Settle reservation fees via GCash, Maya, or card through a secure gateway.</p>
+    </div>
+  </div>
+
+  <p class="center muted" style="margin-top:1.4rem">
+    Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a>
+    &middot; Administrator? <a href="{% url 'accounts:register_admin' %}">Register here</a>
+  </p>
+{% endif %}
+{% endblock %}

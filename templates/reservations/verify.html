@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Verify reservation · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <h1 class="card__title">Arrival verification</h1>
+
+  {% if invalid %}
+    <div class="alert alert--error">Invalid or tampered QR token. Ask the customer for a valid code.</div>
+  {% endif %}
+
+  {% if reservation %}
+    <table class="data">
+      <tr><th>Code</th><td><strong>{{ reservation.code }}</strong></td></tr>
+      <tr><th>Customer</th><td>{{ reservation.customer.get_full_name|default:reservation.customer.username }}</td></tr>
+      <tr><th>Slot</th><td>{{ reservation.slot.code }} ({{ reservation.slot.floor.name }})</td></tr>
+      <tr><th>Window</th><td>{{ reservation.start_at|date:"M j, H:i" }}–{{ reservation.end_at|date:"H:i" }}</td></tr>
+      <tr><th>Status</th><td><span class="badge badge--{{ reservation.status_badge }}">{{ reservation.get_status_display }}</span></td></tr>
+    </table>
+    {% if reservation.status == "RESERVED" %}
+      <form method="post" style="margin-top:1rem">
+        {% csrf_token %}
+        <input type="hidden" name="t" value="{{ token }}">
+        <button type="submit" class="btn btn--block">Confirm arrival — mark occupied</button>
+      </form>
+    {% else %}
+      <p class="muted" style="margin-top:1rem">No arrival action available for this status.</p>
+    {% endif %}
+  {% elif not invalid %}
+    <p class="muted">Scan a reservation QR code, or open a verification link, to validate an arrival.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Facility Guide · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1 style="margin:0 0 .3rem">Parking facility guide</h1>
+  <p class="muted" style="margin:0">
+    Explore each floor of the campus parking facility and check live availability
+    before you book.
+  </p>
+</div>
+
+<div class="facility-grid">
+  {% for row in floors %}
+    <article class="facility-card">
+      <div class="facility-card__photo">
+        {% if row.floor.image %}
+          <img src="{% static row.floor.image %}" alt="{{ row.floor.name }}" loading="lazy">
+        {% else %}
+          <div class="facility-card__photo--placeholder">{{ row.floor.code }}</div>
+        {% endif %}
+        <span class="facility-card__badge">{{ row.available }} available</span>
+      </div>
+      <div class="facility-card__body">
+        <h3>{{ row.floor.name }}</h3>
+        <p class="muted facility-card__stats">
+          {{ row.total }} slots · {{ row.occupied }} occupied
+          {% if row.maintenance %}· {{ row.maintenance }} maintenance{% endif %}
+        </p>
+        <a class="btn btn--sm" href="{% url 'parking:slots' %}?floor={{ row.floor.pk }}">
+          View available slots
+        </a>
+      </div>
+    </article>
+  {% empty %}
+    <div class="card center"><p class="muted">No parking floors have been set up yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

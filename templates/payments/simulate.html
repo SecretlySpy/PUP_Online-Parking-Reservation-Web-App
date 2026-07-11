@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Payment · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow">
+  <h1 class="card__title">Simulated payment gateway</h1>
+  <div class="alert alert--info">
+    Development mode — no PayMongo keys configured. This screen stands in for the
+    hosted GCash / Maya / card checkout so the flow can be tested end-to-end.
+  </div>
+  <table class="data">
+    <tr><th>Reference</th><td>{{ payment.reference }}</td></tr>
+    <tr><th>Slot</th><td>{{ payment.reservation.slot.code }}</td></tr>
+    <tr><th>Amount</th><td style="font-weight:800">{{ payment.amount_display }}</td></tr>
+  </table>
+  <form method="post" style="margin-top:1rem">
+    {% csrf_token %}
+    <div class="form-actions">
+      <button type="submit" name="action" value="success" class="btn">Pay {{ payment.amount_display }}</button>
+      <button type="submit" name="action" value="fail" class="btn btn--danger">Simulate failure</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

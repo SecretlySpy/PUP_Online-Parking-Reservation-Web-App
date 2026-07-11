@@ -1,0 +1,16 @@
+Hi {{ reservation.customer.get_full_name|default:reservation.customer.username }},
+
+Your parking reservation is confirmed and paid. Thank you!
+
+  Reservation code : {{ reservation.code }}
+  Slot             : {{ reservation.slot.code }} ({{ reservation.slot.floor.name }})
+  Vehicle          : {% if reservation.vehicle %}{{ reservation.vehicle.label }}{% else %}—{% endif %}
+  Date & time      : {{ reservation.start_at|date:"M j, Y H:i" }} - {{ reservation.end_at|date:"H:i" }}
+  Amount paid      : {{ payment.amount_display }} ({{ payment.method|default:"online"|upper }})
+
+Present your QR code on arrival for verification. You can view it any time here:
+  {{ base_url }}{% url 'reservations:detail' reservation.pk %}
+
+See you at the campus parking facility.
+
+— {{ site_name }}

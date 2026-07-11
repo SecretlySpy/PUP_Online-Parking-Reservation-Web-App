@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Payments · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card"><h1 style="margin:0">Payment history</h1></div>
+
+{% if payments %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Reference</th><th>Slot</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td><strong>{{ p.reference }}</strong></td>
+          <td>{{ p.reservation.slot.code }}</td>
+          <td>{{ p.amount_display }}</td>
+          <td><span class="badge badge--{{ p.status|lower }}">{{ p.get_status_display }}</span></td>
+          <td>
+            {% if p.is_paid %}<a href="{% url 'payments:receipt' p.pk %}">Receipt</a>
+            {% else %}<a href="{% url 'reservations:detail' p.reservation.pk %}">Pay</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card center"><p class="muted">No payments yet.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Parking availability · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1 class="card__title">Real-time parking availability</h1>
+  <p class="muted">Availability refreshes automatically. Set a date and time range to check a specific booking window.</p>
+
+  <!-- GET form works without JS (server renders the grid); JS upgrades it to
+       live filtering + polling without a full page reload. -->
+  <form id="slot-filters" class="filter-bar" method="get" action="{% url 'parking:slots' %}">
+    <div class="filter-bar__field">{{ form.floor.label_tag }}{{ form.floor }}</div>
+    <div class="filter-bar__field">{{ form.vehicle_type.label_tag }}{{ form.vehicle_type }}</div>
+    <div class="filter-bar__field">{{ form.availability.label_tag }}{{ form.availability }}</div>
+    <div class="filter-bar__field">{{ form.date.label_tag }}{{ form.date }}</div>
+    <div class="filter-bar__field">{{ form.start_time.label_tag }}{{ form.start_time }}</div>
+    <div class="filter-bar__field">{{ form.end_time.label_tag }}{{ form.end_time }}</div>
+    <div class="filter-bar__field filter-bar__actions">
+      <button type="submit" class="btn btn--sm">Apply</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div id="slot-grid" data-endpoint="{% url 'parking:slots_partial' %}">
+    {% include "parking/_slot_grid.html" %}
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+(function () {
+  var container = document.getElementById('slot-grid');
+  var form = document.getElementById('slot-filters');
+  var endpoint = container.dataset.endpoint;
+
+  // Serialise the current filter values into a query string.
+  function queryString() {
+    return new URLSearchParams(new FormData(form)).toString();
+  }
+
+  // Fetch only the slot grid fragment and swap it in — keeps scroll/filters.
+  async function refresh() {
+    try {
+      var resp = await fetch(endpoint + '?' + queryString(),
+                            { headers: { 'X-Requested-With': 'fetch' } });
+      if (resp.ok) { container.innerHTML = await resp.text(); }
+    } catch (e) { /* transient network error: keep last good render */ }
+  }
+
+  // Instant refresh when a filter changes (no page reload).
+  form.addEventListener('change', refresh);
+  form.addEventListener('submit', function (e) { e.preventDefault(); refresh(); });
+  // Auto-refresh every 10s to satisfy the real-time monitoring requirement.
+  setInterval(refresh, 10000);
+})();
+</script>
+{% endblock %}

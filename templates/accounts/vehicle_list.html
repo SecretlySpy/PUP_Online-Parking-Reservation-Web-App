@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}My Vehicles · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem">
+    <h1 style="margin:0">My Vehicles</h1>
+    <a class="btn" href="{% url 'accounts:vehicle_add' %}">Add vehicle</a>
+  </div>
+</div>
+
+{% if vehicles %}
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Plate</th><th>Type</th><th>Make / Model</th><th>Color</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for v in vehicles %}
+        <tr>
+          <td><strong>{{ v.plate_number }}</strong></td>
+          <td>{{ v.get_vehicle_type_display }}</td>
+          <td>{{ v.make }} {{ v.model }}</td>
+          <td>{{ v.color }}</td>
+          <td style="white-space:nowrap">
+            <a href="{% url 'accounts:vehicle_edit' v.pk %}">Edit</a> &middot;
+            <a href="{% url 'accounts:vehicle_delete' v.pk %}">Delete</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card center">
+  <p class="muted">You haven't added any vehicles yet.</p>
+  <a class="btn" href="{% url 'accounts:vehicle_add' %}">Add your first vehicle</a>
+</div>
+{% endif %}
+{% endblock %}

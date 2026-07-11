@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Reservation Manager · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card"><h1 style="margin:0">Reservation manager</h1></div>
+{% include "dashboard/_nav.html" %}
+
+<div class="card">
+  <form method="get" class="filter-bar">
+    <div class="filter-bar__field">
+      <label>Status</label>
+      <select name="status" class="form-input" onchange="this.form.submit()">
+        <option value="">All statuses</option>
+        {% for val, label in statuses %}<option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-bar__field">
+      <label>Floor</label>
+      <select name="floor" class="form-input" onchange="this.form.submit()">
+        <option value="">All floors</option>
+        {% for f in floors %}<option value="{{ f.pk }}" {% if current_floor == f.pk|stringformat:'s' %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
+      </select>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Code</th><th>Customer</th><th>Slot</th><th>When</th><th>Status</th><th>Set status</th></tr></thead>
+      <tbody>
+        {% for r in reservations %}
+        <tr>
+          <td><a href="{% url 'reservations:detail' r.pk %}">{{ r.code }}</a></td>
+          <td>{{ r.customer.get_full_name|default:r.customer.username }}</td>
+          <td>{{ r.slot.code }} ({{ r.slot.floor.code }})</td>
+          <td>{{ r.start_at|date:"M j, H:i" }}–{{ r.end_at|date:"H:i" }}</td>
+          <td><span class="badge badge--{{ r.status_badge }}">{{ r.get_status_display }}</span></td>
+          <td>
+            <form method="post" action="{% url 'dashboard:reservation_status' r.pk %}" style="display:flex;gap:.3rem">
+              {% csrf_token %}
+              <select name="status" class="form-input" style="min-width:120px">
+                {% for val, label in statuses %}<option value="{{ val }}" {% if r.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+              </select>
+              <button class="btn btn--sm">Set</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="muted center">No reservations match.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

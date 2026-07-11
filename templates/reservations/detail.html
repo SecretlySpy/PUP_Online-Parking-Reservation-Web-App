@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Reservation {{ reservation.code }} · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem">
+    <h1 style="margin:0">Reservation {{ reservation.code }}</h1>
+    <span class="badge badge--{{ reservation.status_badge }}">{{ reservation.get_status_display }}</span>
+  </div>
+</div>
+
+<div class="grid grid--2">
+  <div class="card">
+    <h3>Booking details</h3>
+    <table class="data">
+      <tr><th>Slot</th><td>{{ reservation.slot.code }} ({{ reservation.slot.floor.name }})</td></tr>
+      <tr><th>Type</th><td>{{ reservation.slot.get_slot_type_display }}</td></tr>
+      <tr><th>Vehicle</th><td>{% if reservation.vehicle %}{{ reservation.vehicle.label }}{% else %}—{% endif %}</td></tr>
+      <tr><th>Start</th><td>{{ reservation.start_at|date:"M j, Y H:i" }}</td></tr>
+      <tr><th>End</th><td>{{ reservation.end_at|date:"M j, Y H:i" }}</td></tr>
+      <tr><th>Fee</th><td>{{ reservation.fee_display }}</td></tr>
+    </table>
+    <div class="form-actions">
+      {% if reservation.is_modifiable %}
+        <a class="btn btn--ghost" href="{% url 'reservations:modify' reservation.pk %}">Modify</a>
+      {% endif %}
+      {% if reservation.is_cancellable %}
+        <form method="post" action="{% url 'reservations:cancel' reservation.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--danger">Cancel</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card center">
+    {% if payment and payment.is_paid %}
+      <h3>Arrival QR</h3>
+      <p class="muted">Present this on arrival for verification.</p>
+      <img src="{% url 'reservations:qr' reservation.pk %}" alt="QR for {{ reservation.code }}"
+           width="220" height="220" style="max-width:100%;height:auto">
+      <p><strong>{{ reservation.code }}</strong></p>
+      <p><a href="{% url 'payments:receipt' payment.pk %}">View receipt</a></p>
+    {% else %}
+      <h3>Payment required</h3>
+      <p class="muted">Pay the reservation fee to receive your arrival QR code.</p>
+      <p style="font-size:1.6rem;font-weight:800">{{ reservation.fee_display }}</p>
+      {% if payment.status == "FAILED" %}
+        <div class="alert alert--error">Last payment failed. Please try again.</div>
+      {% endif %}
+      {% if reservation.status != "CANCELLED" %}
+        <a class="btn btn--block" href="{% url 'payments:start' reservation.pk %}">Pay now</a>
+        <p class="muted" style="margin-top:.6rem;font-size:.8rem">GCash, Maya, or card via secure gateway.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

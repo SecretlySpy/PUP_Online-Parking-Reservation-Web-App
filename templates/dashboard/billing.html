@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Billing & Payments · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card"><h1 style="margin:0">Billing &amp; payments</h1></div>
+{% include "dashboard/_nav.html" %}
+
+<div class="card">
+  <form method="get" class="filter-bar">
+    <div class="filter-bar__field">
+      <label>Payment status</label>
+      <select name="status" class="form-input" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for val, label in statuses %}<option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Gateway transactions</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Reference</th><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Paid at</th></tr></thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td>{{ p.reference }}</td>
+          <td>{{ p.reservation.customer.username }}</td>
+          <td>{{ p.amount_display }}</td>
+          <td>{{ p.method|default:"—"|upper }}</td>
+          <td><span class="badge badge--{{ p.status|lower }}">{{ p.get_status_display }}</span></td>
+          <td>{{ p.paid_at|date:"M j, H:i"|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="muted center">No payments.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Billing records</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Issued</th><th>Reference</th><th>Customer</th><th>Description</th><th>Amount</th></tr></thead>
+      <tbody>
+        {% for b in records %}
+        <tr>
+          <td>{{ b.issued_at|date:"M j, H:i" }}</td>
+          <td>{{ b.reference }}</td>
+          <td>{{ b.customer.username }}</td>
+          <td>{{ b.description }}</td>
+          <td>{{ b.amount_display }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="muted center">No billing records.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
