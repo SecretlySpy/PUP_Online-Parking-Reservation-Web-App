@@ -1,6 +1,8 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core import mail
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -9,6 +11,7 @@ from accounts.models import Roles, Vehicle
 from core.constants import VehicleType
 from parking.models import Floor, Slot, SlotStatus
 from parking.services import slots_with_availability
+from payments.models import Payment, PaymentStatus
 
 from .models import Reservation, ReservationStatus
 from .utils import sign_reservation, unsign_token
@@ -62,6 +65,19 @@ class ReservationModelTests(TestCase):
         )
         self.assertTrue(conflict.exists())
 
+    def test_database_rejects_non_positive_reservation_window(self):
+        start = timezone.now() + timedelta(hours=1)
+
+        # The database constraint is the final integrity boundary when a caller
+        # bypasses the form and service validation layers.
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Reservation.objects.create(
+                customer=self.user,
+                slot=self.slot,
+                start_at=start,
+                end_at=start,
+            )
+
 
 class BookingFlowTests(TestCase):
     def setUp(self):
@@ -86,11 +102,31 @@ class BookingFlowTests(TestCase):
         }
 
     def test_customer_can_book_slot(self):
-        resp = self.client.post(
-            reverse("reservations:create", args=[self.slot.pk]), self._payload()
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(
+                reverse("reservations:create", args=[self.slot.pk]), self._payload()
+            )
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(Reservation.objects.filter(customer=self.user).count(), 1)
+        self.assertTrue(
+            Payment.objects.filter(
+                reservation__customer=self.user,
+                status=PaymentStatus.PENDING,
+            ).exists()
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("complete payment", mail.outbox[0].body.lower())
+
+    def test_vehicle_type_must_match_slot(self):
+        self.vehicle.vehicle_type = VehicleType.MOTORCYCLE
+        self.vehicle.save(update_fields=["vehicle_type"])
+        response = self.client.post(
+            reverse("reservations:create", args=[self.slot.pk]),
+            self._payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not match")
+        self.assertFalse(Reservation.objects.exists())
 
     def test_double_booking_rejected(self):
         # First booking succeeds.
@@ -106,9 +142,12 @@ class BookingFlowTests(TestCase):
     def test_cancel_frees_the_slot(self):
         self.client.post(reverse("reservations:create", args=[self.slot.pk]), self._payload())
         r = Reservation.objects.get()
-        self.client.post(reverse("reservations:cancel", args=[r.pk]))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("reservations:cancel", args=[r.pk]))
         r.refresh_from_db()
         self.assertEqual(r.status, ReservationStatus.CANCELLED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("cancelled", mail.outbox[0].subject.lower())
 
     def test_detail_and_history_pages_render(self):
         self.client.post(reverse("reservations:create", args=[self.slot.pk]), self._payload())
@@ -160,10 +199,18 @@ class VerificationTests(TestCase):
         self.admin = User.objects.create_user(
             username="adm", email="adm@e.com", password=PW, role=Roles.ADMIN, is_staff=True
         )
-        start = timezone.now() + timedelta(hours=1)
+        # A five-minute lead is inside the configured early-arrival grace.
+        start = timezone.now() + timedelta(minutes=5)
         self.res = Reservation.objects.create(
             customer=self.customer, slot=self.slot,
             start_at=start, end_at=start + timedelta(hours=1),
+        )
+        self.payment = Payment.objects.create(
+            reservation=self.res,
+            amount_cents=self.res.fee_cents,
+            reference=self.res.code,
+            status=PaymentStatus.PAID,
+            paid_at=timezone.now(),
         )
 
     def test_staff_verify_marks_occupied(self):
@@ -190,3 +237,34 @@ class VerificationTests(TestCase):
         resp = self.client.get(reverse("reservations:qr", args=[self.res.pk]))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "image/png")
+
+    def test_unpaid_owner_cannot_fetch_qr_or_check_in(self):
+        self.payment.status = PaymentStatus.PENDING
+        self.payment.paid_at = None
+        self.payment.save(update_fields=["status", "paid_at"])
+        self.client.force_login(self.customer)
+        self.assertEqual(
+            self.client.get(reverse("reservations:qr", args=[self.res.pk])).status_code,
+            403,
+        )
+
+        self.client.force_login(self.admin)
+        token = sign_reservation(self.res)
+        self.client.post(reverse("reservations:verify"), {"t": token})
+        self.res.refresh_from_db()
+        self.assertEqual(self.res.status, ReservationStatus.RESERVED)
+
+    def test_paid_reservation_cannot_check_in_too_early(self):
+        self.res.start_at = timezone.now() + timedelta(hours=2)
+        self.res.end_at = self.res.start_at + timedelta(hours=1)
+        self.res.save(update_fields=["start_at", "end_at"])
+        self.client.force_login(self.admin)
+        token = sign_reservation(self.res)
+        response = self.client.post(
+            reverse("reservations:verify"),
+            {"t": token},
+            follow=True,
+        )
+        self.res.refresh_from_db()
+        self.assertEqual(self.res.status, ReservationStatus.RESERVED)
+        self.assertContains(response, "not yet within")

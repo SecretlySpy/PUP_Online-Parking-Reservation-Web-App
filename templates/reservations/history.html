@@ -34,4 +34,5 @@
   <a class="btn" href="{% url 'parking:slots' %}">Find a slot</a>
 </div>
 {% endif %}
+{% include "partials/pagination.html" with page_obj=page_obj %}
 {% endblock %}

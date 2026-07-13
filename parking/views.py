@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_required
@@ -29,6 +32,12 @@ def _resolve_filters(request):
         filters["start"], filters["end"] = build_window(
             cd.get("date"), cd.get("start_time"), cd.get("end_time")
         )
+    if not filters["start"]:
+        # An unfiltered page promises real-time availability, so its default is
+        # a tiny window around now rather than physical maintenance state only.
+        now = timezone.now()
+        filters["start"] = now
+        filters["end"] = now + timedelta(seconds=1)
     return form, filters
 
 

@@ -38,7 +38,8 @@ class Reservation(models.Model):
         default=ReservationStatus.RESERVED,
     )
     code = models.CharField(max_length=16, unique=True, editable=False)
-    # Fee snapshot (centavos) taken at booking time; paid in Phase 4.
+    # Preserve the quoted fee in centavos so later configuration changes do not
+    # alter the amount owed for an existing reservation.
     fee_cents = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,6 +47,14 @@ class Reservation(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["slot", "status", "start_at", "end_at"])]
+        constraints = [
+            # Forms and services provide friendly errors; this invariant also
+            # protects imports, scripts, and direct ORM/admin writes.
+            models.CheckConstraint(
+                condition=models.Q(end_at__gt=models.F("start_at")),
+                name="reservation_end_after_start",
+            )
+        ]
 
     def __str__(self):
         return f"{self.code} · {self.slot.code}"

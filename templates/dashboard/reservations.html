@@ -39,10 +39,14 @@
           <td>
             <form method="post" action="{% url 'dashboard:reservation_status' r.pk %}" style="display:flex;gap:.3rem">
               {% csrf_token %}
-              <select name="status" class="form-input" style="min-width:120px">
-                {% for val, label in statuses %}<option value="{{ val }}" {% if r.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
-              </select>
-              <button class="btn btn--sm">Set</button>
+              {% if r.allowed_transitions %}
+                <select name="status" class="form-input" style="min-width:120px">
+                  {% for val, label in r.allowed_transitions %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+                </select>
+                <button class="btn btn--sm">Set</button>
+              {% else %}
+                <span class="muted">Final state</span>
+              {% endif %}
             </form>
           </td>
         </tr>
@@ -52,5 +56,6 @@
       </tbody>
     </table>
   </div>
+  {% include "dashboard/_pagination.html" with page_obj=reservations page_parameter="page" retained_query=pagination_query label="reservations" %}
 </div>
 {% endblock %}

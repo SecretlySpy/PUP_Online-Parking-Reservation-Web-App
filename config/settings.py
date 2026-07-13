@@ -30,6 +30,10 @@ SECRET_KEY = env(
 )
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+# Only the dedicated test settings module changes this code-owned sentinel.
+# It is intentionally not environment-driven, so deployment configuration
+# cannot claim to be the isolated test runtime and reopen test-only paths.
+TESTING = False
 
 # CSRF trusted origins (needed once served over a real domain / tunnel).
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
@@ -58,6 +62,9 @@ INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise serves fingerprinted STATIC_ROOT assets in production; user
+    # uploads under MEDIA_ROOT still belong behind dedicated object/web storage.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -127,9 +134,15 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "core:home"
 LOGOUT_REDIRECT_URL = "core:home"
 
-# Optional shared secret gating administrator self-registration. Empty in dev
-# (no gate); set a value in production so only authorised staff can register.
+# Administrator self-registration is disabled unless an operator deliberately
+# enables it.  Requiring both a feature flag and a code avoids the previous
+# fail-open behaviour where an omitted environment variable meant "no gate".
+ADMIN_SIGNUP_ENABLED = env.bool("ADMIN_SIGNUP_ENABLED", default=False)
 ADMIN_SIGNUP_CODE = env("ADMIN_SIGNUP_CODE", default="")
+# Failed enrollment-code attempts are counted in the audit table by source IP,
+# which keeps throttling consistent across multiple application workers.
+ADMIN_SIGNUP_MAX_ATTEMPTS = env.int("ADMIN_SIGNUP_MAX_ATTEMPTS", default=5)
+ADMIN_SIGNUP_WINDOW_MINUTES = env.int("ADMIN_SIGNUP_WINDOW_MINUTES", default=15)
 
 
 # --- Internationalization ---------------------------------------------------
@@ -143,6 +156,19 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        # Keep local development frictionless while production receives
+        # immutable, compressed assets with content-hashed filenames.
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        )
+    },
+}
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -161,6 +187,7 @@ EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL", default="PUP Parking <no-reply@pupparking.local>"
 )
@@ -170,8 +197,27 @@ DEFAULT_FROM_EMAIL = env(
 PAYMONGO_SECRET_KEY = env("PAYMONGO_SECRET_KEY", default="")
 PAYMONGO_PUBLIC_KEY = env("PAYMONGO_PUBLIC_KEY", default="")
 PAYMONGO_WEBHOOK_SECRET = env("PAYMONGO_WEBHOOK_SECRET", default="")
+# Reject signed events outside this freshness window to limit replay exposure.
+PAYMONGO_WEBHOOK_TOLERANCE_SECONDS = env.int(
+    "PAYMONGO_WEBHOOK_TOLERANCE_SECONDS", default=300
+)
+# Simulation changes payment state without contacting PayMongo, so it must be
+# opted into explicitly and is additionally constrained to DEBUG (or the
+# code-owned test sentinel) by the gateway helper.
+PAYMENT_SIMULATION_ENABLED = env.bool(
+    "PAYMENT_SIMULATION_ENABLED", default=False
+)
 # Reservation fee in the smallest currency unit (centavos). Default ₱50.00.
 RESERVATION_FEE_CENTS = env.int("RESERVATION_FEE_CENTS", default=5000)
+# Unpaid holds expire through ``process_reservations`` after this many minutes.
+# A zero value disables only grace-based expiry; ended bookings still reconcile.
+RESERVATION_PAYMENT_GRACE_MINUTES = env.int(
+    "RESERVATION_PAYMENT_GRACE_MINUTES", default=30
+)
+# Customers may check in slightly early to account for a physical gate queue.
+RESERVATION_ARRIVAL_GRACE_MINUTES = env.int(
+    "RESERVATION_ARRIVAL_GRACE_MINUTES", default=15
+)
 
 
 # --- Site / branding --------------------------------------------------------
@@ -191,3 +237,50 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+# --- Logging ---------------------------------------------------------------
+# Keep application and security events visible in every environment while
+# leaving log collection/rotation to the hosting platform.  Avoiding file
+# handlers also keeps containers and read-only deployments portable.
+LOG_LEVEL = env("LOG_LEVEL", default="INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        }
+    },
+    "loggers": {
+        # Django request/security logs include rejected hosts, CSRF failures,
+        # and server errors that operators need to investigate quickly.
+        "django.request": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        # Project namespaces share one predictable console policy.
+        "accounts": {"handlers": ["console"], "level": LOG_LEVEL},
+        "payments": {"handlers": ["console"], "level": LOG_LEVEL},
+        "reservations": {"handlers": ["console"], "level": LOG_LEVEL},
+    },
+}
+
+
+# Import the deployment checks only after every setting they inspect exists.
+# Django's check registry then includes these checks for ``check --deploy``
+# without requiring the project settings package to masquerade as an app.
+from config import checks as deployment_checks  # noqa: E402, F401

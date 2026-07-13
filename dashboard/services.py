@@ -20,15 +20,37 @@ def _counts_by(model, field, choices):
 
 
 def slot_stats():
+    """Return live slot KPIs without double-counting reservation rows.
+
+    A slot is blocking only while an active reservation overlaps the current
+    instant.  Physical maintenance takes precedence, so a maintenance slot is
+    reported once in that category even if stale reservation data also covers
+    it.
+    """
+    now = timezone.now()
     total = Slot.objects.count()
     maintenance = Slot.objects.filter(status=SlotStatus.MAINTENANCE).count()
-    occupied = Reservation.objects.filter(status=ReservationStatus.OCCUPIED).count()
+    # Count distinct slot IDs because data imported from older deployments may
+    # contain overlapping active rows for one slot; KPIs describe spaces, not
+    # reservation records.
+    blocking_now = (
+        Reservation.objects.filter(
+            status__in=ACTIVE_STATUSES,
+            start_at__lte=now,
+            end_at__gt=now,
+        )
+        .exclude(slot__status=SlotStatus.MAINTENANCE)
+        .values("slot_id")
+        .distinct()
+        .count()
+    )
     return {
         "total": total,
         "maintenance": maintenance,
-        "occupied_now": occupied,
-        # Physically usable and not currently occupied.
-        "available_now": max(total - maintenance - occupied, 0),
+        "occupied_now": blocking_now,
+        # Maintenance and live reservation blockers are disjoint by design,
+        # which keeps the availability equation stable even with stale data.
+        "available_now": max(total - maintenance - blocking_now, 0),
     }
 
 

@@ -17,7 +17,9 @@
       <tr><th>Window</th><td>{{ reservation.start_at|date:"M j, H:i" }}–{{ reservation.end_at|date:"H:i" }}</td></tr>
       <tr><th>Status</th><td><span class="badge badge--{{ reservation.status_badge }}">{{ reservation.get_status_display }}</span></td></tr>
     </table>
-    {% if reservation.status == "RESERVED" %}
+    {% if eligibility_error %}
+      <div class="alert alert--error" style="margin-top:1rem">{{ eligibility_error }}</div>
+    {% elif reservation.status == "RESERVED" %}
       <form method="post" style="margin-top:1rem">
         {% csrf_token %}
         <input type="hidden" name="t" value="{{ token }}">

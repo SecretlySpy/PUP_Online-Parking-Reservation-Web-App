@@ -1,5 +1,10 @@
+import logging
+
 from django.conf import settings
 from django.db import models
+
+
+logger = logging.getLogger(__name__)
 
 
 class ActivityLog(models.Model):
@@ -54,4 +59,7 @@ def log_activity(action, description="", actor=None, request=None):
             ip_address=ip,
         )
     except Exception:
+        # Audit logging remains non-fatal, but operators still need the original
+        # exception to diagnose a missing migration or database outage.
+        logger.exception("Unable to persist activity log action=%s", action)
         return None

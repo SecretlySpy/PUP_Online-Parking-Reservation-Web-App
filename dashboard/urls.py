@@ -15,5 +15,17 @@ urlpatterns = [
         name="reservation_status",
     ),
     path("billing/", views.billing, name="billing"),
+    path(
+        "billing/<int:pk>/status/",
+        views.payment_update_status,
+        name="payment_status",
+    ),
+    path("customers/", views.customers, name="customers"),
+    path("customers/<int:pk>/", views.customer_detail, name="customer_detail"),
+    path(
+        "customers/<int:pk>/active/",
+        views.customer_toggle_active,
+        name="customer_toggle_active",
+    ),
     path("reports/", views.reports, name="reports"),
 ]

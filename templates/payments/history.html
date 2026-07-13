@@ -29,4 +29,5 @@
 {% else %}
 <div class="card center"><p class="muted">No payments yet.</p></div>
 {% endif %}
+{% include "partials/pagination.html" with page_obj=page_obj %}
 {% endblock %}

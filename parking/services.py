@@ -6,9 +6,8 @@ Availability has two layers:
 * temporal  — for a requested [start, end) window the slot must have no
   overlapping active reservation.
 
-The reservation layer is resolved lazily via ``apps.get_model`` so this module
-works before the reservations app exists (Phase 2) and automatically becomes
-window-aware once it does (Phase 3).
+The reservation layer is resolved lazily via ``apps.get_model`` to avoid a
+module-level circular import while keeping availability window-aware.
 """
 
 from datetime import datetime, timedelta

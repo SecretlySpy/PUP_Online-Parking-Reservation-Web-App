@@ -49,7 +49,10 @@
         <div class="alert alert--error">Last payment failed. Please try again.</div>
       {% endif %}
       {% if reservation.status != "CANCELLED" %}
-        <a class="btn btn--block" href="{% url 'payments:start' reservation.pk %}">Pay now</a>
+        <form method="post" action="{% url 'payments:start' reservation.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--block">Pay now</button>
+        </form>
         <p class="muted" style="margin-top:.6rem;font-size:.8rem">GCash, Maya, or card via secure gateway.</p>
       {% endif %}
     {% endif %}

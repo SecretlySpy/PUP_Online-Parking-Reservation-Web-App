@@ -1,0 +1,11 @@
+{{ site_name }}
+
+Reservation {{ reservation.code }} has been cancelled by {{ cancelled_by }}.
+
+Slot: {{ reservation.slot.code }} ({{ reservation.slot.floor.name }})
+Window: {{ reservation.start_at }} to {{ reservation.end_at }}
+
+{% if requires_refund_review %}This reservation was already paid. Please contact parking administration so the manual refund review can be completed.{% endif %}
+
+View your reservation history:
+{{ base_url }}{% url 'reservations:history' %}

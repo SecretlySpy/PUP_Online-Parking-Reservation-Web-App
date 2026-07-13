@@ -1,0 +1,13 @@
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<!-- Customer history lists have no additional filters, so the page parameter
+     is sufficient and avoids carrying arbitrary query input into links. -->
+<nav aria-label="Pagination" style="display:flex;justify-content:center;align-items:center;gap:.6rem;margin:1rem 0">
+  {% if page_obj.has_previous %}
+    <a class="btn btn--sm btn--ghost" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+  {% endif %}
+  <span class="muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a class="btn btn--sm btn--ghost" href="?page={{ page_obj.next_page_number }}">Next</a>
+  {% endif %}
+</nav>
+{% endif %}

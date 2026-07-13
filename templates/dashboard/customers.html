@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Customers · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card"><h1 style="margin:0">Customer management</h1></div>
+{% include "dashboard/_nav.html" %}
+
+<div class="card">
+  <form method="get" class="filter-bar">
+    <div class="filter-bar__field">
+      <label for="customer-search">Search</label>
+      <input id="customer-search" name="q" value="{{ current_query }}" placeholder="Name, email, ID, contact">
+    </div>
+    <div class="filter-bar__field">
+      <label for="customer-role">Role</label>
+      <select id="customer-role" name="role" class="form-input">
+        <option value="">All customer roles</option>
+        {% for value, label in customer_roles %}<option value="{{ value }}" {% if current_role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-bar__field">
+      <label for="customer-active">Account status</label>
+      <select id="customer-active" name="active" class="form-input">
+        <option value="">All statuses</option>
+        <option value="1" {% if current_active == "1" %}selected{% endif %}>Active</option>
+        <option value="0" {% if current_active == "0" %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <div class="filter-bar__actions">
+      <button class="btn btn--sm">Apply filters</button>
+      <a class="btn btn--sm btn--ghost" href="{% url 'dashboard:customers' %}">Clear</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Customer</th><th>Role</th><th>ID number</th><th>Vehicles</th><th>Reservations</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr>
+          <td><strong>{{ customer.get_full_name|default:customer.username }}</strong><br><span class="muted">{{ customer.email }}</span></td>
+          <td>{{ customer.get_role_display }}</td>
+          <td>{{ customer.id_number|default:"—" }}</td>
+          <td>{{ customer.vehicle_count }}</td>
+          <td>{{ customer.reservation_count }}</td>
+          <td>{% if customer.is_active %}<span class="badge badge--available">Active</span>{% else %}<span class="badge badge--failed">Inactive</span>{% endif %}</td>
+          <td><a class="btn btn--sm btn--ghost" href="{% url 'dashboard:customer_detail' customer.pk %}">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="muted center">No customers match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "dashboard/_pagination.html" with page_obj=customers page_parameter="page" retained_query=pagination_query label="customers" %}
+</div>
+{% endblock %}

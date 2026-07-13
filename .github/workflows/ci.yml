@@ -1,0 +1,46 @@
+name: Django QA
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      # A clean checkout catches accidental reliance on the developer's local
+      # SQLite file, generated static output, or untracked environment files.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check dependency compatibility
+        run: python -m pip check
+      - name: Run Django system and migration checks
+        run: |
+          python manage.py check --settings=config.settings_test
+          python manage.py makemigrations --check --dry-run --settings=config.settings_test
+      - name: Run the hermetic regression suite
+        run: python manage.py test --settings=config.settings_test --verbosity 1
+      - name: Verify production deployment checks and static collection
+        env:
+          DEBUG: "False"
+          SECRET_KEY: "ci-only-T7v9-Q2m4-R8x6-K3p5-W1n0-H4s2-Z9c7-B6f8-U5a3"
+          ALLOWED_HOSTS: "localhost"
+          SITE_BASE_URL: "https://parking.example.invalid"
+          ADMIN_SIGNUP_ENABLED: "False"
+          PAYMENT_SIMULATION_ENABLED: "False"
+          PAYMONGO_SECRET_KEY: "sk_test_ci_nonplaceholder_123456"
+          PAYMONGO_PUBLIC_KEY: "pk_test_ci_nonplaceholder_123456"
+          PAYMONGO_WEBHOOK_SECRET: "whsk_ci_nonplaceholder_123456"
+          PAYMONGO_WEBHOOK_TOLERANCE_SECONDS: "300"
+          EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+          EMAIL_HOST: "smtp.invalid"
+          EMAIL_TIMEOUT: "10"
+        run: |
+          python manage.py check --deploy
+          python manage.py collectstatic --noinput

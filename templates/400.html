@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Bad request · {{ SITE_SHORT_NAME }}{% endblock %}
+{% block content %}
+<div class="card card--narrow center">
+  <h1>We could not understand that request</h1>
+  <p class="muted">Check the submitted information and try again.</p>
+  <a class="btn" href="{% url 'core:home' %}">Return home</a>
+</div>
+{% endblock %}

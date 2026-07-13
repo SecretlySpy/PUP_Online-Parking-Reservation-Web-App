@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Access denied · {{ SITE_SHORT_NAME }}{% endblock %}
+{% block content %}
+<div class="card card--narrow center">
+  <h1>Access denied</h1>
+  <p class="muted">Your account does not have permission to perform this action.</p>
+  <a class="btn" href="{% url 'core:home' %}">Return home</a>
+</div>
+{% endblock %}

@@ -1,5 +1,6 @@
 from django.contrib import messages
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -10,6 +11,15 @@ from parking.models import Slot
 
 from .forms import ReservationForm
 from .models import Reservation, ReservationStatus
+from .services import (
+    ReservationConflict,
+    ReservationTransitionError,
+    check_in_error,
+    create_reservation,
+    modify_reservation,
+    payment_for,
+    transition_reservation,
+)
 from .utils import qr_png_bytes, unsign_token, verification_url
 
 
@@ -32,21 +42,25 @@ def create(request, slot_id):
     if request.method == "POST":
         form = ReservationForm(request.POST, slot=slot, user=request.user)
         if form.is_valid():
-            reservation = Reservation.objects.create(
-                customer=request.user,
-                slot=slot,
-                vehicle=form.cleaned_data["vehicle"],
-                start_at=form.cleaned_data["start_at"],
-                end_at=form.cleaned_data["end_at"],
-            )
-            log_activity(
-                "reservation.created",
-                f"{reservation.code} · {slot.code}",
-                actor=request.user,
-                request=request,
-            )
-            messages.success(request, f"Slot {slot.code} reserved — code {reservation.code}.")
-            return redirect("reservations:detail", pk=reservation.pk)
+            try:
+                reservation = create_reservation(
+                    customer=request.user,
+                    slot_id=slot.pk,
+                    vehicle_id=form.cleaned_data["vehicle"].pk,
+                    start_at=form.cleaned_data["start_at"],
+                    end_at=form.cleaned_data["end_at"],
+                    request=request,
+                )
+            except (ReservationConflict, ValidationError) as exc:
+                # A concurrent request may win after form validation; surface
+                # the authoritative transaction result as a normal form error.
+                form.add_error(None, exc.messages[0])
+            else:
+                messages.success(
+                    request,
+                    f"Slot {slot.code} reserved — code {reservation.code}.",
+                )
+                return redirect("reservations:detail", pk=reservation.pk)
     else:
         form = ReservationForm(initial=initial, slot=slot, user=request.user)
 
@@ -77,7 +91,12 @@ def detail(request, pk):
 @customer_required
 def history(request):
     reservations = request.user.reservations.select_related("slot", "slot__floor")
-    return render(request, "reservations/history.html", {"reservations": reservations})
+    page = Paginator(reservations, 20).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "reservations/history.html",
+        {"reservations": page.object_list, "page_obj": page},
+    )
 
 
 # --- Modify / cancel ---------------------------------------------------------
@@ -93,13 +112,20 @@ def modify(request, pk):
             request.POST, slot=reservation.slot, user=request.user, exclude_pk=pk
         )
         if form.is_valid():
-            reservation.vehicle = form.cleaned_data["vehicle"]
-            reservation.start_at = form.cleaned_data["start_at"]
-            reservation.end_at = form.cleaned_data["end_at"]
-            reservation.save()
-            log_activity("reservation.modified", reservation.code, actor=request.user, request=request)
-            messages.success(request, "Reservation updated.")
-            return redirect("reservations:detail", pk=pk)
+            try:
+                modify_reservation(
+                    reservation_id=reservation.pk,
+                    customer=request.user,
+                    vehicle_id=form.cleaned_data["vehicle"].pk,
+                    start_at=form.cleaned_data["start_at"],
+                    end_at=form.cleaned_data["end_at"],
+                    request=request,
+                )
+            except (ReservationConflict, ReservationTransitionError, ValidationError) as exc:
+                form.add_error(None, exc.messages[0])
+            else:
+                messages.success(request, "Reservation updated.")
+                return redirect("reservations:detail", pk=pk)
     else:
         form = ReservationForm(
             initial={
@@ -126,10 +152,21 @@ def cancel(request, pk):
     if not reservation.is_cancellable:
         messages.error(request, "This reservation can no longer be cancelled.")
         return redirect("reservations:detail", pk=pk)
-    reservation.status = ReservationStatus.CANCELLED
-    reservation.save(update_fields=["status", "updated_at"])
-    log_activity("reservation.cancelled", reservation.code, actor=request.user, request=request)
-    messages.success(request, "Reservation cancelled.")
+    try:
+        transition_reservation(
+            reservation_id=reservation.pk,
+            new_status=ReservationStatus.CANCELLED,
+            actor=request.user,
+            request=request,
+            customer_cancel=True,
+        )
+    except ReservationTransitionError as exc:
+        messages.error(request, exc.messages[0])
+        return redirect("reservations:detail", pk=pk)
+    messages.success(
+        request,
+        "Reservation cancelled. Paid bookings require manual refund review.",
+    )
     return redirect("reservations:history")
 
 
@@ -137,8 +174,16 @@ def cancel(request, pk):
 
 def qr(request, pk):
     """Return the reservation's QR code as a PNG (owner or staff only)."""
-    reservation = get_object_or_404(Reservation, pk=pk)
+    reservation = get_object_or_404(
+        Reservation.objects.select_related("customer"),
+        pk=pk,
+    )
     if not (request.user.is_authenticated and _owner_or_admin(request, reservation)):
+        raise PermissionDenied
+    payment = payment_for(reservation)
+    if not reservation.is_active or not payment or not payment.is_paid:
+        # The template gate is only presentation.  This endpoint must enforce
+        # payment itself because its predictable URL can be requested directly.
         raise PermissionDenied
     png = qr_png_bytes(verification_url(reservation))
     return HttpResponse(png, content_type="image/png")
@@ -157,23 +202,37 @@ def verify(request):
             .first()
         )
 
+    eligibility_error = check_in_error(reservation) if reservation else ""
     if request.method == "POST" and reservation:
-        if reservation.status == ReservationStatus.RESERVED:
-            reservation.status = ReservationStatus.OCCUPIED
-            reservation.save(update_fields=["status", "updated_at"])
+        try:
+            reservation = transition_reservation(
+                reservation_id=reservation.pk,
+                new_status=ReservationStatus.OCCUPIED,
+                actor=request.user,
+                request=request,
+            )
+        except ReservationTransitionError as exc:
+            messages.error(request, exc.messages[0])
+        else:
             log_activity(
                 "reservation.verified",
                 f"{reservation.code} marked occupied",
                 actor=request.user,
                 request=request,
             )
-            messages.success(request, f"{reservation.code} verified — slot now occupied.")
-        else:
-            messages.info(request, f"{reservation.code} is {reservation.get_status_display()}.")
+            messages.success(
+                request,
+                f"{reservation.code} verified — slot now occupied.",
+            )
         return redirect(f"{request.path}?t={token}")
 
     return render(
         request,
         "reservations/verify.html",
-        {"reservation": reservation, "token": token, "invalid": token and not reservation},
+        {
+            "reservation": reservation,
+            "token": token,
+            "invalid": token and not reservation,
+            "eligibility_error": eligibility_error,
+        },
     )

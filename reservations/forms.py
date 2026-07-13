@@ -59,11 +59,27 @@ class ReservationForm(forms.Form):
         if duration > MAX_DURATION:
             raise forms.ValidationError("Reservation is too long (maximum 24 hours).")
 
-        # Slot must be physically open (not under maintenance).
-        if self.slot and not self.slot.is_open:
-            raise forms.ValidationError("This slot is currently under maintenance.")
+        # Slot inventory can change after the search page rendered, so validate
+        # both the floor and physical slot state again on submission.
+        if self.slot:
+            if not self.slot.floor.is_active:
+                raise forms.ValidationError(
+                    "This parking floor is not accepting reservations."
+                )
+            if not self.slot.is_open:
+                raise forms.ValidationError("This slot is currently under maintenance.")
 
-        # No overlapping active reservation on the same slot.
+        # Filtering the dropdown by ownership is not enough: a crafted POST can
+        # still pair a valid owned vehicle with an incompatible fixed slot.
+        vehicle = cleaned.get("vehicle")
+        if self.slot and vehicle and not self.slot.accommodates(vehicle.vehicle_type):
+            raise forms.ValidationError(
+                "The selected vehicle type does not match this slot."
+            )
+
+        # This early overlap query gives fast form feedback.  The transactional
+        # reservation service repeats it while holding a slot lock, because a
+        # form-level query alone cannot prevent concurrent double-booking.
         if self.slot and Reservation.overlapping(
             self.slot, start, end, exclude_pk=self.exclude_pk
         ).exists():

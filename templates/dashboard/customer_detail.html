@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ customer_account }} · Customers · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;flex-wrap:wrap">
+    <div>
+      <h1 style="margin:0">{{ customer_account.get_full_name|default:customer_account.username }}</h1>
+      <p class="muted" style="margin:.3rem 0 0">{{ customer_account.get_role_display }} · @{{ customer_account.username }}</p>
+    </div>
+    <form method="post" action="{% url 'dashboard:customer_toggle_active' customer_account.pk %}">
+      {% csrf_token %}
+      {% if customer_account.is_active %}
+        <input type="hidden" name="is_active" value="0">
+        <button class="btn btn--danger">Deactivate customer</button>
+      {% else %}
+        <input type="hidden" name="is_active" value="1">
+        <button class="btn">Reactivate customer</button>
+      {% endif %}
+    </form>
+  </div>
+</div>
+{% include "dashboard/_nav.html" %}
+
+<div class="grid grid--2">
+  <div class="card">
+    <h3>Profile</h3>
+    <table class="data">
+      <tr><th>Email</th><td>{{ customer_account.email }}</td></tr>
+      <tr><th>ID number</th><td>{{ customer_account.id_number|default:"—" }}</td></tr>
+      <tr><th>Contact</th><td>{{ customer_account.contact_number|default:"—" }}</td></tr>
+      <tr><th>Address</th><td>{{ customer_account.address|default:"—" }}</td></tr>
+      <tr><th>Joined</th><td>{{ customer_account.date_joined|date:"M j, Y, H:i" }}</td></tr>
+      <tr><th>Status</th><td>{% if customer_account.is_active %}Active{% else %}Inactive{% endif %}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Payment summary</h3>
+    <p style="font-size:1.6rem;font-weight:800;margin:.2rem 0">{{ paid_total_display }}</p>
+    <p class="muted">total collected</p>
+    <table class="data">
+      <tr><th>Paid</th><td>{{ payment_counts.PAID }}</td></tr>
+      <tr><th>Pending</th><td>{{ payment_counts.PENDING }}</td></tr>
+      <tr><th>Failed</th><td>{{ payment_counts.FAILED }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Vehicles</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Plate</th><th>Type</th><th>Make/model</th><th>Color</th></tr></thead>
+      <tbody>
+        {% for vehicle in vehicles %}
+        <tr><td>{{ vehicle.plate_number }}</td><td>{{ vehicle.get_vehicle_type_display }}</td><td>{{ vehicle.make }} {{ vehicle.model }}</td><td>{{ vehicle.color|default:"—" }}</td></tr>
+        {% empty %}<tr><td colspan="4" class="muted center">No registered vehicles.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Reservations</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Code</th><th>Slot</th><th>Vehicle</th><th>When</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for reservation in reservations %}
+        <tr>
+          <td><a href="{% url 'reservations:detail' reservation.pk %}">{{ reservation.code }}</a></td>
+          <td>{{ reservation.slot.code }} ({{ reservation.slot.floor.code }})</td>
+          <td>{{ reservation.vehicle|default:"—" }}</td>
+          <td>{{ reservation.start_at|date:"M j, Y H:i" }}–{{ reservation.end_at|date:"H:i" }}</td>
+          <td><span class="badge badge--{{ reservation.status_badge }}">{{ reservation.get_status_display }}</span></td>
+        </tr>
+        {% empty %}<tr><td colspan="5" class="muted center">No reservations.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "dashboard/_pagination.html" with page_obj=reservations page_parameter="reservation_page" retained_query=reservation_query label="customer reservations" %}
+</div>
+
+<div class="card">
+  <h3>Payments</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Reference</th><th>Reservation</th><th>Amount</th><th>Method</th><th>Status</th><th>Paid at</th></tr></thead>
+      <tbody>
+        {% for payment in payments %}
+        <tr>
+          <td>{{ payment.reference|default:"—" }}</td><td>{{ payment.reservation.code }}</td><td>{{ payment.amount_display }}</td>
+          <td>{{ payment.method|default:"—"|upper }}</td><td><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></td>
+          <td>{{ payment.paid_at|date:"M j, Y H:i"|default:"—" }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="6" class="muted center">No payments.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "dashboard/_pagination.html" with page_obj=payments page_parameter="payment_page" retained_query=payment_query label="customer payments" %}
+</div>
+{% endblock %}

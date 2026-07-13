@@ -5,9 +5,9 @@ from django.urls import NoReverseMatch, reverse
 def home(request):
     """Public landing page.
 
-    Signed-in users are routed to their workspace. The target views are built
-    in later phases; until they exist we fall back to an authenticated welcome
-    page so every phase stays independently runnable.
+    Signed-in users are routed to the workspace for their effective role. The
+    fallback keeps the landing page usable if an optional URL namespace is
+    temporarily unavailable during maintenance or partial deployments.
     """
     if request.user.is_authenticated:
         if request.user.is_staff or getattr(request.user, "is_admin_role", False):

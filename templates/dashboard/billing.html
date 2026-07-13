@@ -21,7 +21,7 @@
   <h3>Gateway transactions</h3>
   <div class="table-wrap">
     <table class="data">
-      <thead><tr><th>Reference</th><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Paid at</th></tr></thead>
+      <thead><tr><th>Reference</th><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Paid at</th><th>Reconcile</th></tr></thead>
       <tbody>
         {% for p in payments %}
         <tr>
@@ -31,13 +31,27 @@
           <td>{{ p.method|default:"—"|upper }}</td>
           <td><span class="badge badge--{{ p.status|lower }}">{{ p.get_status_display }}</span></td>
           <td>{{ p.paid_at|date:"M j, H:i"|default:"—" }}</td>
+          <td>
+            {% if p.is_paid %}
+              <span class="muted">Locked</span>
+            {% else %}
+              <form method="post" action="{% url 'dashboard:payment_status' p.pk %}" style="display:flex;gap:.3rem">
+                {% csrf_token %}
+                <select name="status" class="form-input" style="min-width:110px">
+                  {% for val, label in statuses %}<option value="{{ val }}" {% if p.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+                <button class="btn btn--sm">Set</button>
+              </form>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="muted center">No payments.</td></tr>
+        <tr><td colspan="7" class="muted center">No payments.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include "dashboard/_pagination.html" with page_obj=payments page_parameter="payment_page" retained_query=payment_query label="payments" %}
 </div>
 
 <div class="card">
@@ -60,5 +74,6 @@
       </tbody>
     </table>
   </div>
+  {% include "dashboard/_pagination.html" with page_obj=records page_parameter="record_page" retained_query=record_query label="billing records" %}
 </div>
 {% endblock %}

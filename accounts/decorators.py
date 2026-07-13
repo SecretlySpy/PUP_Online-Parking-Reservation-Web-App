@@ -39,8 +39,8 @@ def customer_required(view):
         if not request.user.is_authenticated:
             return redirect_to_login(request.get_full_path())
         if request.user.is_admin_role:
-            # Route admins to their own workspace via the home dispatcher
-            # (which resolves the dashboard once that app is built).
+            # Route admins through the central dispatcher so role navigation
+            # remains defined in one place instead of duplicating dashboard URLs.
             return redirect("core:home")
         if not test(request.user):
             raise PermissionDenied

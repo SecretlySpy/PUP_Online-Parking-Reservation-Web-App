@@ -1,3 +1,5 @@
+import secrets
+
 from django import forms
 from django.conf import settings
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
@@ -70,7 +72,9 @@ class AdminRegistrationForm(UserCreationForm):
     def clean_access_code(self):
         expected = getattr(settings, "ADMIN_SIGNUP_CODE", "")
         provided = self.cleaned_data.get("access_code", "")
-        if expected and provided != expected:
+        # Never interpret an absent configuration value as authorization. The
+        # constant-time comparison also avoids leaking useful prefix timing.
+        if not expected or not secrets.compare_digest(provided, expected):
             raise forms.ValidationError("Incorrect administrator access code.")
         return provided
 

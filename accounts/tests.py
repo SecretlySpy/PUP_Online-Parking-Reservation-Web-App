@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Roles, Vehicle
@@ -55,7 +55,37 @@ class RegistrationTests(TestCase):
         self.assertEqual(resp.status_code, 200)  # re-rendered with errors
         self.assertFalse(User.objects.filter(username="juan").exists())
 
+    @override_settings(ADMIN_SIGNUP_ENABLED=False, ADMIN_SIGNUP_CODE="")
+    def test_admin_registration_is_hidden_when_not_explicitly_enabled(self):
+        """The privileged registration route must fail closed by default."""
+        resp = self.client.get(reverse("accounts:register_admin"))
+        self.assertEqual(resp.status_code, 404)
+
+    @override_settings(
+        ADMIN_SIGNUP_ENABLED=True,
+        ADMIN_SIGNUP_CODE="test-admin-signup-code-2026",
+    )
     def test_admin_registration_sets_admin_role_and_staff(self):
+        resp = self.client.post(
+            reverse("accounts:register_admin"),
+            {
+                "username": "boss",
+                "first_name": "Ada",
+                "last_name": "Admin",
+                "email": "ada@example.com",
+                "password1": STRONG_PW,
+                "password2": STRONG_PW,
+                "access_code": "test-admin-signup-code-2026",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        admin = User.objects.get(username="boss")
+        self.assertEqual(admin.role, Roles.ADMIN)
+        self.assertTrue(admin.is_staff)
+
+    @override_settings(ADMIN_SIGNUP_ENABLED=True, ADMIN_SIGNUP_CODE="")
+    def test_admin_registration_rejects_missing_server_side_code(self):
+        """Enabling the route alone cannot recreate the old open signup bug."""
         resp = self.client.post(
             reverse("accounts:register_admin"),
             {
@@ -68,10 +98,40 @@ class RegistrationTests(TestCase):
                 "access_code": "",
             },
         )
-        self.assertEqual(resp.status_code, 302)
-        admin = User.objects.get(username="boss")
-        self.assertEqual(admin.role, Roles.ADMIN)
-        self.assertTrue(admin.is_staff)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(username="boss").exists())
+        self.assertContains(resp, "Incorrect administrator access code.")
+
+    @override_settings(
+        ADMIN_SIGNUP_ENABLED=True,
+        ADMIN_SIGNUP_CODE="test-admin-signup-code-2026",
+        ADMIN_SIGNUP_MAX_ATTEMPTS=2,
+        ADMIN_SIGNUP_WINDOW_MINUTES=15,
+    )
+    def test_admin_registration_throttles_repeated_code_guesses(self):
+        payload = {
+            "username": "boss",
+            "first_name": "Ada",
+            "last_name": "Admin",
+            "email": "ada@example.com",
+            "password1": STRONG_PW,
+            "password2": STRONG_PW,
+            "access_code": "wrong-code",
+        }
+
+        self.assertEqual(
+            self.client.post(reverse("accounts:register_admin"), payload).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(reverse("accounts:register_admin"), payload).status_code,
+            200,
+        )
+        response = self.client.post(reverse("accounts:register_admin"), payload)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, "Too many administrator enrollment attempts", status_code=429)
+        self.assertFalse(User.objects.filter(username="boss").exists())
 
 
 class PasswordResetTests(TestCase):

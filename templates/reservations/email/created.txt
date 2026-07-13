@@ -1,0 +1,12 @@
+{{ site_name }}
+
+Your parking reservation {{ reservation.code }} has been received.
+
+Slot: {{ reservation.slot.code }} ({{ reservation.slot.floor.name }})
+Window: {{ reservation.start_at }} to {{ reservation.end_at }}
+Fee: {{ reservation.fee_display }}
+
+Complete payment by opening your reservation and using the secure Pay now button:
+{{ base_url }}{% url 'reservations:detail' reservation.pk %}
+
+This temporary hold may expire if payment is not completed within the configured payment window.

@@ -1,0 +1,11 @@
+{{ site_name }}
+
+We could not complete payment for reservation {{ reservation.code }}.
+
+Slot: {{ reservation.slot.code }}
+Amount: {{ payment.amount_display }}
+
+Open your reservation and use the secure Pay now button:
+{{ base_url }}{% url 'reservations:detail' reservation.pk %}
+
+If you did not attempt this payment, contact parking administration.

@@ -1,10 +1,14 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import Roles
 from core.constants import VehicleType
+from reservations.models import Reservation, ReservationStatus
 
 from .models import Floor, Slot, SlotStatus
 from .services import facility_floors, slots_with_availability
@@ -66,6 +70,26 @@ class SlotViewTests(TestCase):
         data = resp.json()
         self.assertEqual(data["summary"]["available"], 1)
         self.assertEqual(data["slots"][0]["code"], "G-01")
+
+    def test_unfiltered_api_reports_current_reservation_as_unavailable(self):
+        customer = User.objects.create_user(
+            username="live-customer",
+            email="live@example.com",
+            password="Str0ngPass!23",
+            role=Roles.STUDENT,
+        )
+        slot = Slot.objects.get(code="G-01")
+        now = timezone.now()
+        Reservation.objects.create(
+            customer=customer,
+            slot=slot,
+            start_at=now - timedelta(minutes=5),
+            end_at=now + timedelta(minutes=30),
+            status=ReservationStatus.RESERVED,
+        )
+        payload = self.client.get(reverse("parking:slots_api")).json()
+        self.assertEqual(payload["summary"]["available"], 0)
+        self.assertFalse(payload["slots"][0]["available"])
 
 
 class FacilityGuideTests(TestCase):
