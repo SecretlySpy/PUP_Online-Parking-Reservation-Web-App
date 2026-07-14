@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Activity Log · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card page-header">
+  <h1>Activity log</h1>
+  <a class="btn btn--sm" href="?export=csv{% if current_action %}&action={{ current_action }}{% endif %}{% if current_query %}&q={{ current_query|urlencode }}{% endif %}">Export CSV</a>
+</div>
+{% include "dashboard/_nav.html" %}
+
+<div class="card">
+  <form method="get" class="filter-bar">
+    <div class="filter-bar__field">
+      <label for="act-search">Search</label>
+      <input id="act-search" name="q" value="{{ current_query }}" placeholder="Actor, action, detail">
+    </div>
+    <div class="filter-bar__field">
+      <label for="act-action">Action</label>
+      <select id="act-action" name="action" class="form-input">
+        <option value="">All actions</option>
+        {% for a in actions %}<option value="{{ a }}" {% if current_action == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-bar__actions">
+      <button class="btn btn--sm">Apply</button>
+      <a class="btn btn--sm btn--ghost" href="{% url 'dashboard:activity_log' %}">Clear</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data table--stack">
+      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td data-label="When">{{ e.created_at|date:"M j, Y H:i:s" }}</td>
+          <td data-label="Actor">{{ e.actor_label|default:"system" }}</td>
+          <td data-label="Action"><code>{{ e.action }}</code></td>
+          <td data-label="Details">{{ e.description|default:"—" }}</td>
+          <td data-label="IP">{{ e.ip_address|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="muted center">No activity matches these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "dashboard/_pagination.html" with page_obj=entries page_parameter="page" retained_query=pagination_query label="events" %}
+</div>
+{% endblock %}

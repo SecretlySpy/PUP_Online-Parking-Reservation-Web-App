@@ -32,12 +32,19 @@ def _owner_or_admin(request, reservation):
 
 @customer_required
 def create(request, slot_id):
+    # Booking is gated on a verified email; self-registered customers start
+    # unverified until they follow the emailed link.
+    if not getattr(request.user, "email_verified", True):
+        messages.info(request, "Please verify your email before booking a slot.")
+        return redirect("accounts:verify_notice")
     slot = get_object_or_404(Slot, pk=slot_id)
-    # Carry any date/time chosen on the slot-search page into the booking form.
+    # Carry any date/time/vehicle chosen on the slot-search page or a "Rebook"
+    # link into the booking form (quick re-book).
     initial = {
         "date": request.GET.get("date"),
         "start_time": request.GET.get("start_time"),
         "end_time": request.GET.get("end_time"),
+        "vehicle": request.GET.get("vehicle"),
     }
     if request.method == "POST":
         form = ReservationForm(request.POST, slot=slot, user=request.user)
@@ -186,7 +193,12 @@ def qr(request, pk):
         # payment itself because its predictable URL can be requested directly.
         raise PermissionDenied
     png = qr_png_bytes(verification_url(reservation))
-    return HttpResponse(png, content_type="image/png")
+    response = HttpResponse(png, content_type="image/png")
+    if request.GET.get("download"):
+        response["Content-Disposition"] = (
+            f'attachment; filename="reservation-{reservation.code}.png"'
+        )
+    return response
 
 
 @admin_required
@@ -219,6 +231,7 @@ def verify(request):
                 f"{reservation.code} marked occupied",
                 actor=request.user,
                 request=request,
+                target_user=reservation.customer,
             )
             messages.success(
                 request,

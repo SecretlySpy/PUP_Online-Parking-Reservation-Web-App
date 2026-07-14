@@ -1111,3 +1111,45 @@
 - **Outputs:** Required external services.
 - **Dependencies:** Hosting platform.
 - **Behavior:** WhiteNoise serves static assets only; production media requires separate storage/serving. Concurrency claims assume MySQL. Scheduler and SMTP must be provisioned externally.
+
+---
+
+## Enhancement Layer — UX, Responsiveness & Theming (Workstream A)
+
+- **Responsive CSS (`static/css/main.css`):** added `@media` breakpoints (1024/768/700/560). Component surfaces re-pointed to themeable tokens (`--surface`/`--surface-2`/`--info*`). Mobile: hamburger nav, full-width filter fields/form-actions, fluid hero/type. `prefers-reduced-motion` honored.
+- **Dark mode:** token overrides via `@media (prefers-color-scheme: dark)` AND `:root[data-theme="dark"|"light"]` (viewer toggle wins both ways). Pre-paint inline script in `base.html` reads `localStorage.theme` to avoid flash; toggle button + persistence in `static/js/ui.js`.
+- **Mobile nav:** accessible `.nav-toggle` (aria-expanded/controls) collapsing `#site-nav` under 768px; closes on link/Escape.
+- **Toasts:** Django `messages` render in a fixed `aria-live="polite"` region with close buttons; `ui.js` auto-dismisses success/info after ~6s. `.alert--debug` styled.
+- **Confirm dialogs:** `ui.js` intercepts `data-confirm="…"` submits/links — cancel reservation, slot maintenance toggle, deactivate customer.
+- **Live-poll (`static/js/live-poll.js`):** replaces the two duplicated inline scripts; driven by `.live-poll[data-poll-endpoint]` (+ `data-poll-form`), shows an `aria-live` "Updating…/Couldn't refresh" status, and **pauses on hidden tabs** (visibilitychange). Used by `parking/slots.html` + `dashboard/monitor.html`.
+- **Responsive tables:** `.table--stack` (`td[data-label]::before`) converts wide admin tables (reservations, billing, customers, customer_detail, slot_list) to stacked key/value cards under 700px instead of horizontal scroll.
+- **A11y:** skip-to-content link, `:focus-visible` rings, associated filter labels + Apply buttons on formerly JS-only filter bars (reservation manager, billing, slot list), larger tap targets.
+- **Files:** `static/css/main.css`, `templates/base.html`, new `static/js/ui.js` + `static/js/live-poll.js`, and the dashboard/reservation/parking templates above. **QA:** `check` clean; 104/104 tests pass; assets + wiring verified live.
+
+---
+
+## Enhancement Layer — Customer Features (Workstream B)
+
+- **Booking reminders (B1):** `Reservation.reminder_sent_at` (migration `reservations.0003`); `reservations.lifecycle._send_due_reminders` sends a one-time email for PAID + RESERVED bookings starting within `RESERVATION_REMINDER_MINUTES` (default 30; 0 disables), stamped under a conditional UPDATE for at-most-once delivery; wired into `process_reservation_lifecycle` + `process_reservations` output (`reminders_sent=`). Email `reservations/notifications.send_reservation_reminder_email` + `templates/reservations/email/reminder.txt`.
+- **My Activity feed (B2):** `ActivityLog.target_user` FK (migration `core.0002`); `log_activity(..., target_user=)` defaults to `actor`, and is set explicitly for admin/webhook/scheduler events (payments paid/failed/pending, reservation status changes, verify, unpaid-hold expiry). `core.customer_activity(user)` = `Q(actor=user)|Q(target_user=user)`. View `accounts.activity` → `templates/accounts/activity.html` (paginated 20), nav "Activity".
+- **Quick re-book (B3):** `reservations.create` view `initial` now also reads `?vehicle=`; "Rebook" links on `reservations/history.html` + `detail.html` (terminal statuses) pre-fill slot + vehicle. No model change.
+- **PDF receipt + QR download (B4):** `reportlab` dep; `payments.receipts.build_receipt_pdf` renders an A5 receipt; `payments.receipt_pdf` view (`payments:receipt_pdf`, owner/admin + paid) returns an attachment; "Download PDF" on the receipt page. `reservations.qr?download=1` sets `Content-Disposition: attachment`; "Download QR" on the reservation detail.
+- **Tests:** `reservations/test_lifecycle.py::ReservationReminderTests`, `accounts/tests_activity.py`, `payments/tests_receipt_pdf.py`, `reservations/tests_rebook_qr.py`. **Migrations:** `core.0002_activitylog_target_user`, `reservations.0003_reservation_reminder_sent_at` (applied; `check` clean). Settings: `RESERVATION_REMINDER_MINUTES` (+ `settings_test` parity).
+
+---
+
+## Enhancement Layer — Admin & Security (Workstream C)
+
+- **Audit-log viewer (C1):** `dashboard.activity_log` view over `ActivityLog` with action + text-search filters and pagination (`_page_context`); `templates/dashboard/activity.html`; `.dash-nav` "Activity Log" link.
+- **CSV export (C2):** `_csv_response()` helper; `?export=csv` branches on `dashboard.reservations_manager` (filtered reservations), `billing` (filtered payments), `reports` (slots-by-floor), and `activity_log`. Streams a `text/csv` attachment via the stdlib `csv` module (no dependency). Export buttons on each page preserve active filters.
+- **Login rate-limiting (C3):** `accounts.ThrottledLoginView` (replaces the inline `LoginView`) counts recent `auth.login_failed` audit rows by client IP within `LOGIN_ATTEMPT_WINDOW_MINUTES`; once `LOGIN_MAX_ATTEMPTS` is exceeded it returns HTTP 429 with a form error and logs `auth.login_throttled`. Reuses the durable-audit throttle pattern from admin signup.
+- **Email verification (C4):** `User.email_verified` (default **True** so existing/admin/programmatic accounts are unaffected; migration `accounts.0002`). `register_customer` sets it False and emails a signed link (`accounts.verification` — `django.core.signing`, independent of the auth hash, `EMAIL_VERIFICATION_MAX_AGE` = 3 days). `accounts.verify_email/<token>` verifies; `verify_notice` + `resend_verification` handle the gate. `reservations.create` redirects unverified customers to the notice. Templates: `accounts/verify_notice.html`, `accounts/email/verify_email.txt`.
+- **Tests:** `dashboard/tests_audit_csv.py`, `accounts/tests_security.py`. **Settings:** `LOGIN_MAX_ATTEMPTS`, `LOGIN_ATTEMPT_WINDOW_MINUTES`, `EMAIL_VERIFICATION_MAX_AGE` (+ `settings_test` parity). **Migration:** `accounts.0002_user_email_verified` (applied; `check` clean; 70 C-affected tests green).
+
+---
+
+## Enhancement Layer — Dashboard Charts (Workstream D)
+
+- **Snapshot model (D1):** `parking.OccupancySnapshot` (`captured_at`, total/available/occupied/maintenance, `paid_revenue_cents`; migration `parking.0003`). Management command `parking/management/commands/capture_occupancy_snapshot.py` records one snapshot from `dashboard.services.slot_stats()` + `payment_stats()` — run ~every 15 min alongside `process_reservations`.
+- **Inline-SVG charts (D2):** `dashboard/charts.py` renders **server-side inline SVG** (no JS/CDN) — `line_chart_svg` (occupancy trend, area+line) and `bar_chart_svg` (reservation status mix). Colours reference CSS custom properties (`var(--maroon)`/`var(--info)`/…) so charts are **theme-aware** (light/dark) and each has an accessible `<title>`/`aria-label`. `dashboard.services.occupancy_series(hours=48)` feeds the trend from snapshots. `reports.html` shows both, with a graceful empty-state before any snapshot exists.
+- **Tests:** `dashboard/tests_charts.py` (capture command, series, chart render, empty-state). **Migration:** `parking.0003_occupancysnapshot`.

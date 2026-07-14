@@ -1,0 +1,10 @@
+Hi {{ user.get_full_name|default:user.username }},
+
+Welcome to {{ site_name }}! Please confirm your email address by opening the
+link below. You need a verified email before you can book a parking slot.
+
+{{ link }}
+
+If you didn't create this account, you can safely ignore this message.
+
+— {{ site_name }}

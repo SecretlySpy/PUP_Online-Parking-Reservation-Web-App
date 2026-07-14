@@ -251,3 +251,63 @@ class ReservationLifecycleTests(TestCase):
         reservation.refresh_from_db()
         self.assertEqual(reservation.status, ReservationStatus.OCCUPIED)
         self.assertIn("DRY RUN completed=1", output.getvalue())
+
+
+class ReservationReminderTests(TestCase):
+    """Pre-arrival reminder emails for paid, soon-to-start reservations."""
+
+    def setUp(self):
+        from django.core import mail  # noqa: F401 (import kept local to class use)
+        self.at = timezone.now().replace(microsecond=0)
+        self.user = User.objects.create_user(
+            username="reminder-customer",
+            email="reminder@example.com",
+            password="Str0ngPass!23",
+            role=Roles.STUDENT,
+        )
+        self.floor = Floor.objects.create(name="Reminder", code="RM", sort_order=98)
+        self.slot = Slot.objects.create(floor=self.floor, code="RM-01", slot_type=VehicleType.CAR)
+
+    def _paid_upcoming(self, *, minutes_ahead=20):
+        reservation = Reservation.objects.create(
+            customer=self.user, slot=self.slot, status=ReservationStatus.RESERVED,
+            start_at=self.at + timedelta(minutes=minutes_ahead),
+            end_at=self.at + timedelta(minutes=minutes_ahead + 60),
+        )
+        Payment.objects.create(
+            reservation=reservation, amount_cents=5000, reference=reservation.code,
+            status=PaymentStatus.PAID, paid_at=self.at,
+        )
+        return reservation
+
+    def test_reminder_sent_once_for_paid_upcoming(self):
+        from django.core import mail
+        reservation = self._paid_upcoming()
+        # The reminder email is dispatched via transaction.on_commit, which does
+        # not fire inside TestCase's rolled-back transaction unless captured.
+        with self.captureOnCommitCallbacks(execute=True):
+            summary = process_reservation_lifecycle(at=self.at, payment_grace=None)
+        self.assertEqual(summary.reminders_sent, 1)
+        reservation.refresh_from_db()
+        self.assertIsNotNone(reservation.reminder_sent_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(
+            ActivityLog.objects.filter(action="reservation.reminder_sent").exists()
+        )
+        # Idempotent: a second pass sends nothing more.
+        again = process_reservation_lifecycle(at=self.at, payment_grace=None)
+        self.assertEqual(again.reminders_sent, 0)
+
+    def test_reminder_requires_paid_payment(self):
+        Reservation.objects.create(
+            customer=self.user, slot=self.slot, status=ReservationStatus.RESERVED,
+            start_at=self.at + timedelta(minutes=20), end_at=self.at + timedelta(minutes=80),
+        )  # no payment
+        summary = process_reservation_lifecycle(at=self.at, payment_grace=None)
+        self.assertEqual(summary.reminders_sent, 0)
+
+    @override_settings(RESERVATION_REMINDER_MINUTES=0)
+    def test_reminder_disabled_when_zero(self):
+        self._paid_upcoming()
+        summary = process_reservation_lifecycle(at=self.at, payment_grace=None)
+        self.assertEqual(summary.reminders_sent, 0)

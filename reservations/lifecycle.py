@@ -18,7 +18,7 @@ from core.models import log_activity
 from payments.models import Payment, PaymentStatus
 
 from .models import Reservation, ReservationStatus
-from .notifications import send_cancellation_email
+from .notifications import send_cancellation_email, send_reservation_reminder_email
 
 
 # A sentinel lets callers explicitly pass ``None`` to disable expiry while the
@@ -33,10 +33,15 @@ class LifecycleSummary:
     completed: int = 0
     ended_cancelled: int = 0
     unpaid_cancelled: int = 0
+    reminders_sent: int = 0
 
     @property
     def total(self):
-        """Return the number of reservations changed (or matched in dry-run)."""
+        """Return the number of reservations changed (or matched in dry-run).
+
+        Reminders are a notification side effect, not a state change, so they
+        are tracked separately and excluded from this transition total.
+        """
 
         return self.completed + self.ended_cancelled + self.unpaid_cancelled
 
@@ -63,6 +68,71 @@ def _configured_payment_grace():
     if grace <= timedelta(0):
         raise ValueError("RESERVATION_PAYMENT_GRACE_MINUTES must be positive.")
     return grace
+
+
+def _configured_reminder_window():
+    """Return the pre-arrival reminder lead time as a ``timedelta`` or ``None``.
+
+    Missing, zero, and ``None`` disable reminders — matching the conservative
+    opt-in behaviour of the unpaid-hold grace period.
+    """
+
+    minutes = getattr(settings, "RESERVATION_REMINDER_MINUTES", None)
+    if minutes in (None, "", 0, "0"):
+        return None
+    try:
+        window = timedelta(minutes=float(minutes))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "RESERVATION_REMINDER_MINUTES must be a positive number or empty."
+        ) from exc
+    if window <= timedelta(0):
+        raise ValueError("RESERVATION_REMINDER_MINUTES must be positive.")
+    return window
+
+
+def _send_due_reminders(*, at, window, dry_run):
+    """Email a one-time reminder for paid reservations starting within window."""
+
+    if window is None:
+        return 0
+
+    horizon = at + window
+    candidates = Reservation.objects.filter(
+        status=ReservationStatus.RESERVED,
+        reminder_sent_at__isnull=True,
+        start_at__gt=at,
+        start_at__lte=horizon,
+        payment__status=PaymentStatus.PAID,
+    ).values_list("pk", "code")
+    if dry_run:
+        return candidates.count()
+
+    changed = 0
+    for reservation_id, code in candidates.iterator():
+        with transaction.atomic():
+            # Stamp-before-send under a conditional UPDATE guarantees at-most-once
+            # delivery even if two workers race on the same reservation.
+            updated = Reservation.objects.filter(
+                pk=reservation_id,
+                reminder_sent_at__isnull=True,
+                status=ReservationStatus.RESERVED,
+            ).update(reminder_sent_at=at)
+            if not updated:
+                continue
+            reservation = Reservation.objects.select_related(
+                "customer", "slot__floor"
+            ).get(pk=reservation_id)
+            log_activity(
+                "reservation.reminder_sent",
+                description=f"Sent an upcoming-arrival reminder for {code}.",
+                target_user=reservation.customer,
+            )
+            transaction.on_commit(
+                lambda r=reservation: send_reservation_reminder_email(r)
+            )
+            changed += 1
+    return changed
 
 
 def _normalise_at(at):
@@ -181,6 +251,7 @@ def _expire_unpaid_holds(*, at, grace, dry_run):
                     f"payment {payment.pk} remained {payment.status} beyond the "
                     f"{grace.total_seconds() / 60:g}-minute grace period."
                 ),
+                target_user=reservation.customer,
             )
             transaction.on_commit(
                 lambda reservation=reservation: send_cancellation_email(
@@ -237,9 +308,15 @@ def process_reservation_lifecycle(
         grace=grace,
         dry_run=dry_run,
     )
+    reminders_sent = _send_due_reminders(
+        at=moment,
+        window=_configured_reminder_window(),
+        dry_run=dry_run,
+    )
 
     return LifecycleSummary(
         completed=completed,
         ended_cancelled=ended_cancelled,
         unpaid_cancelled=unpaid_cancelled,
+        reminders_sent=reminders_sent,
     )

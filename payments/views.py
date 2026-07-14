@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -309,16 +309,41 @@ def _payment_mismatch(payment, checkout):
     return ""
 
 
-def receipt(request, pk):
-    """Electronic receipt for a completed payment (owner or admin)."""
-    payment = get_object_or_404(Payment, pk=pk)
+def _receipt_payment_or_deny(request, pk):
+    """Fetch a payment the requester may view a receipt for, or 403."""
+    payment = get_object_or_404(
+        Payment.objects.select_related(
+            "reservation", "reservation__slot__floor", "reservation__customer"
+        ),
+        pk=pk,
+    )
     owner = payment.reservation.customer_id == request.user.id
     if not (request.user.is_authenticated and (owner or request.user.is_admin_role)):
         raise PermissionDenied
+    return payment
+
+
+def receipt(request, pk):
+    """Electronic receipt for a completed payment (owner or admin)."""
+    payment = _receipt_payment_or_deny(request, pk)
     if not payment.is_paid:
         messages.info(request, "No receipt yet — this payment is not completed.")
         return redirect("reservations:detail", pk=payment.reservation.pk)
     return render(request, "payments/receipt.html", {"payment": payment})
+
+
+def receipt_pdf(request, pk):
+    """Downloadable PDF version of the receipt (owner or admin, paid only)."""
+    from .receipts import build_receipt_pdf
+
+    payment = _receipt_payment_or_deny(request, pk)
+    if not payment.is_paid:
+        raise Http404("No receipt for an incomplete payment.")
+    response = HttpResponse(build_receipt_pdf(payment), content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="receipt-{payment.reference or payment.pk}.pdf"'
+    )
+    return response
 
 
 @customer_required

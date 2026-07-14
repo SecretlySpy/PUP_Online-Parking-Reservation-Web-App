@@ -2,36 +2,40 @@
 {% block title %}Billing & Payments · {{ SITE_SHORT_NAME }}{% endblock %}
 
 {% block content %}
-<div class="card"><h1 style="margin:0">Billing &amp; payments</h1></div>
+<div class="card page-header">
+  <h1>Billing &amp; payments</h1>
+  <a class="btn btn--sm" href="?export=csv{% if current_status %}&status={{ current_status }}{% endif %}">Export payments CSV</a>
+</div>
 {% include "dashboard/_nav.html" %}
 
 <div class="card">
   <form method="get" class="filter-bar">
     <div class="filter-bar__field">
-      <label>Payment status</label>
-      <select name="status" class="form-input" onchange="this.form.submit()">
+      <label for="pay-status">Payment status</label>
+      <select name="status" id="pay-status" class="form-input">
         <option value="">All</option>
         {% for val, label in statuses %}<option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </div>
+    <div class="filter-bar__actions"><button class="btn btn--sm">Apply</button></div>
   </form>
 </div>
 
 <div class="card">
   <h3>Gateway transactions</h3>
   <div class="table-wrap">
-    <table class="data">
+    <table class="data table--stack">
       <thead><tr><th>Reference</th><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Paid at</th><th>Reconcile</th></tr></thead>
       <tbody>
         {% for p in payments %}
         <tr>
-          <td>{{ p.reference }}</td>
-          <td>{{ p.reservation.customer.username }}</td>
-          <td>{{ p.amount_display }}</td>
-          <td>{{ p.method|default:"—"|upper }}</td>
-          <td><span class="badge badge--{{ p.status|lower }}">{{ p.get_status_display }}</span></td>
-          <td>{{ p.paid_at|date:"M j, H:i"|default:"—" }}</td>
-          <td>
+          <td data-label="Reference">{{ p.reference }}</td>
+          <td data-label="Customer">{{ p.reservation.customer.username }}</td>
+          <td data-label="Amount">{{ p.amount_display }}</td>
+          <td data-label="Method">{{ p.method|default:"—"|upper }}</td>
+          <td data-label="Status"><span class="badge badge--{{ p.status|lower }}">{{ p.get_status_display }}</span></td>
+          <td data-label="Paid at">{{ p.paid_at|date:"M j, H:i"|default:"—" }}</td>
+          <td data-label="Reconcile">
             {% if p.is_paid %}
               <span class="muted">Locked</span>
             {% else %}
@@ -57,16 +61,16 @@
 <div class="card">
   <h3>Billing records</h3>
   <div class="table-wrap">
-    <table class="data">
+    <table class="data table--stack">
       <thead><tr><th>Issued</th><th>Reference</th><th>Customer</th><th>Description</th><th>Amount</th></tr></thead>
       <tbody>
         {% for b in records %}
         <tr>
-          <td>{{ b.issued_at|date:"M j, H:i" }}</td>
-          <td>{{ b.reference }}</td>
-          <td>{{ b.customer.username }}</td>
-          <td>{{ b.description }}</td>
-          <td>{{ b.amount_display }}</td>
+          <td data-label="Issued">{{ b.issued_at|date:"M j, H:i" }}</td>
+          <td data-label="Reference">{{ b.reference }}</td>
+          <td data-label="Customer">{{ b.customer.username }}</td>
+          <td data-label="Description">{{ b.description }}</td>
+          <td data-label="Amount">{{ b.amount_display }}</td>
         </tr>
         {% empty %}
         <tr><td colspan="5" class="muted center">No billing records.</td></tr>

@@ -1,15 +1,19 @@
+import csv
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_required
 from accounts.models import CUSTOMER_ROLES, Roles
 from core.constants import VehicleType
-from core.models import log_activity
+from core.models import ActivityLog, log_activity
 from parking.models import Floor
 from payments.models import BillingRecord, Payment, PaymentStatus
 from payments.services import (
@@ -40,6 +44,17 @@ def _page_context(request, queryset, page_parameter, page_size):
     retained = request.GET.copy()
     retained.pop(page_parameter, None)
     return page, retained.urlencode()
+
+
+def _csv_response(filename, header, rows):
+    """Stream an attachment CSV built from an iterable of row tuples."""
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow(row)
+    return response
 
 
 def _customer_queryset():
@@ -106,6 +121,25 @@ def reservations_manager(request):
         qs = qs.filter(status=status)
     if floor_id:
         qs = qs.filter(slot__floor_id=floor_id)
+
+    if request.GET.get("export") == "csv":
+        return _csv_response(
+            "reservations.csv",
+            ["Code", "Customer", "Slot", "Floor", "Start", "End", "Status"],
+            (
+                [
+                    r.code,
+                    r.customer.get_full_name() or r.customer.username,
+                    r.slot.code,
+                    r.slot.floor.name,
+                    r.start_at.strftime("%Y-%m-%d %H:%M"),
+                    r.end_at.strftime("%Y-%m-%d %H:%M"),
+                    r.get_status_display(),
+                ]
+                for r in qs.iterator()
+            ),
+        )
+
     reservations, pagination_query = _page_context(
         request, qs, "page", page_size=50
     )
@@ -167,6 +201,24 @@ def billing(request):
     status = request.GET.get("status") or None
     if status:
         payments = payments.filter(status=status)
+
+    if request.GET.get("export") == "csv":
+        return _csv_response(
+            "payments.csv",
+            ["Reference", "Customer", "Amount", "Method", "Status", "Paid at"],
+            (
+                [
+                    p.reference,
+                    p.reservation.customer.username,
+                    f"{p.amount_cents / 100:.2f}",
+                    (p.method or "").upper(),
+                    p.get_status_display(),
+                    p.paid_at.strftime("%Y-%m-%d %H:%M") if p.paid_at else "",
+                ]
+                for p in payments.iterator()
+            ),
+        )
+
     payment_page, payment_query = _page_context(
         request, payments, "payment_page", page_size=50
     )
@@ -385,4 +437,89 @@ def customer_toggle_active(request, pk):
 
 @admin_required
 def reports(request):
-    return render(request, "dashboard/reports.html", services.dashboard_overview())
+    overview = services.dashboard_overview()
+    if request.GET.get("export") == "csv":
+        return _csv_response(
+            "report-slots-by-floor.csv",
+            ["Floor", "Code", "Total", "Usable", "Maintenance"],
+            (
+                [
+                    row["floor"].name,
+                    row["floor"].code,
+                    row["total"],
+                    row["usable"],
+                    row["maintenance"],
+                ]
+                for row in overview["floors"]
+            ),
+        )
+
+    # Time-series (from snapshots) + a status-mix bar built from live counts.
+    from . import charts
+
+    series = services.occupancy_series(hours=48)
+    res = overview["reservations"]
+    overview["occupancy_chart"] = charts.line_chart_svg(series)
+    overview["has_occupancy_series"] = bool(series)
+    overview["status_chart"] = charts.bar_chart_svg(
+        [
+            ("Reserved", res["RESERVED"], "var(--info)"),
+            ("Occupied", res["OCCUPIED"], "var(--err)"),
+            ("Completed", res["COMPLETED"], "var(--muted)"),
+            ("Cancelled", res["CANCELLED"], "var(--muted)"),
+        ]
+    )
+    return render(request, "dashboard/reports.html", overview)
+
+
+# --- Activity log (audit trail viewer) --------------------------------------
+
+@admin_required
+def activity_log(request):
+    """Paginated, searchable/filterable view over the full audit trail."""
+    entries = ActivityLog.objects.select_related("actor")
+    action = request.GET.get("action") or ""
+    query = (request.GET.get("q") or "").strip()
+    if action:
+        entries = entries.filter(action=action)
+    if query:
+        entries = entries.filter(
+            Q(actor_label__icontains=query)
+            | Q(description__icontains=query)
+            | Q(action__icontains=query)
+        )
+
+    if request.GET.get("export") == "csv":
+        return _csv_response(
+            "activity-log.csv",
+            ["When", "Actor", "Action", "Description", "IP"],
+            (
+                [
+                    e.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    e.actor_label,
+                    e.action,
+                    e.description,
+                    e.ip_address or "",
+                ]
+                for e in entries.iterator()
+            ),
+        )
+
+    page, pagination_query = _page_context(request, entries, "page", page_size=50)
+    actions = list(
+        ActivityLog.objects.order_by()
+        .values_list("action", flat=True)
+        .distinct()
+        .order_by("action")
+    )
+    return render(
+        request,
+        "dashboard/activity.html",
+        {
+            "entries": page,
+            "pagination_query": pagination_query,
+            "actions": actions,
+            "current_action": action,
+            "current_query": query,
+        },
+    )

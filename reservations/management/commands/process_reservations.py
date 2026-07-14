@@ -45,7 +45,8 @@ class Command(BaseCommand):
         self.stdout.write(
             f"{mode} completed={summary.completed} "
             f"ended_cancelled={summary.ended_cancelled} "
-            f"unpaid_cancelled={summary.unpaid_cancelled} total={summary.total}"
+            f"unpaid_cancelled={summary.unpaid_cancelled} "
+            f"reminders_sent={summary.reminders_sent} total={summary.total}"
         )
 
     @staticmethod

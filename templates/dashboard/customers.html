@@ -35,17 +35,17 @@
 
 <div class="card">
   <div class="table-wrap">
-    <table class="data">
+    <table class="data table--stack">
       <thead><tr><th>Customer</th><th>Role</th><th>ID number</th><th>Vehicles</th><th>Reservations</th><th>Status</th><th></th></tr></thead>
       <tbody>
         {% for customer in customers %}
         <tr>
-          <td><strong>{{ customer.get_full_name|default:customer.username }}</strong><br><span class="muted">{{ customer.email }}</span></td>
-          <td>{{ customer.get_role_display }}</td>
-          <td>{{ customer.id_number|default:"—" }}</td>
-          <td>{{ customer.vehicle_count }}</td>
-          <td>{{ customer.reservation_count }}</td>
-          <td>{% if customer.is_active %}<span class="badge badge--available">Active</span>{% else %}<span class="badge badge--failed">Inactive</span>{% endif %}</td>
+          <td data-label="Customer"><strong>{{ customer.get_full_name|default:customer.username }}</strong><br><span class="muted">{{ customer.email }}</span></td>
+          <td data-label="Role">{{ customer.get_role_display }}</td>
+          <td data-label="ID number">{{ customer.id_number|default:"—" }}</td>
+          <td data-label="Vehicles">{{ customer.vehicle_count }}</td>
+          <td data-label="Reservations">{{ customer.reservation_count }}</td>
+          <td data-label="Status">{% if customer.is_active %}<span class="badge badge--available">Active</span>{% else %}<span class="badge badge--failed">Inactive</span>{% endif %}</td>
           <td><a class="btn btn--sm btn--ghost" href="{% url 'dashboard:customer_detail' customer.pk %}">View</a></td>
         </tr>
         {% empty %}

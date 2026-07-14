@@ -40,6 +40,10 @@ class User(AbstractUser):
     contact_number = models.CharField(max_length=32, blank=True)
     address = models.CharField(max_length=255, blank=True)
     email = models.EmailField("email address", unique=True)
+    # Defaults True so existing/admin/programmatic accounts are unaffected; the
+    # customer self-registration flow sets it False and gates booking until the
+    # emailed verification link is followed.
+    email_verified = models.BooleanField(default=True)
 
     objects = CustomUserManager()
 

@@ -2,22 +2,33 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import get_user_model, login
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
-from core.models import ActivityLog, log_activity
+from core.models import ActivityLog, customer_activity, log_activity
 
 from .decorators import customer_required
 from .forms import (
     AdminRegistrationForm,
     CustomerRegistrationForm,
+    LoginForm,
     ProfileForm,
     VehicleForm,
 )
 from .models import Vehicle
+from .verification import (
+    make_email_token,
+    read_email_token,
+    send_verification_email,
+)
+
+User = get_user_model()
 
 
 def register_customer(request):
@@ -27,15 +38,23 @@ def register_customer(request):
     if request.method == "POST":
         form = CustomerRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)
+            # New self-registrations must confirm their email before booking.
+            user.email_verified = False
+            user.save()
             log_activity(
                 "user.registered",
                 f"{user.get_role_display()} account created",
                 actor=user,
                 request=request,
             )
+            send_verification_email(user)
             login(request, user)
-            messages.success(request, "Welcome! Your account is ready.")
+            messages.success(
+                request,
+                "Welcome! We've emailed you a link to verify your address — "
+                "verify it to start booking.",
+            )
             return redirect("core:home")
     else:
         form = CustomerRegistrationForm()
@@ -125,6 +144,95 @@ def profile(request):
     else:
         form = ProfileForm(instance=request.user)
     return render(request, "accounts/profile.html", {"form": form})
+
+
+@customer_required
+def activity(request):
+    """A customer-facing feed of their own booking/payment events."""
+    entries = customer_activity(request.user)
+    page = Paginator(entries, 20).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "accounts/activity.html",
+        {"entries": page.object_list, "page_obj": page},
+    )
+
+
+# --- Email verification -----------------------------------------------------
+
+def verify_email(request, token):
+    """Confirm an email address from the signed link and unlock booking."""
+    payload = read_email_token(token, max_age=settings.EMAIL_VERIFICATION_MAX_AGE)
+    if payload:
+        user = User.objects.filter(
+            pk=payload.get("uid"), email=payload.get("email")
+        ).first()
+        if user:
+            if not user.email_verified:
+                user.email_verified = True
+                user.save(update_fields=["email_verified"])
+                log_activity(
+                    "user.email_verified", "Email address verified",
+                    actor=user, request=request, target_user=user,
+                )
+            messages.success(request, "Your email is verified — you can now book slots.")
+            return redirect("core:home")
+    messages.error(request, "That verification link is invalid or has expired.")
+    return redirect("accounts:verify_notice")
+
+
+@login_required
+def verify_notice(request):
+    """Explain that verification is required and offer to resend the link."""
+    if getattr(request.user, "email_verified", True):
+        return redirect("core:home")
+    return render(request, "accounts/verify_notice.html")
+
+
+@login_required
+@require_POST
+def resend_verification(request):
+    """Re-send the verification email to the signed-in, unverified user."""
+    if not request.user.email_verified:
+        send_verification_email(request.user)
+        messages.success(request, "Verification email sent. Please check your inbox.")
+    return redirect("accounts:verify_notice")
+
+
+class ThrottledLoginView(auth_views.LoginView):
+    """Login that rate-limits repeated failures by client IP (audit-backed)."""
+
+    template_name = "accounts/login.html"
+    authentication_form = LoginForm
+    redirect_authenticated_user = True
+
+    def _recent_failures(self):
+        window_start = timezone.now() - timedelta(
+            minutes=settings.LOGIN_ATTEMPT_WINDOW_MINUTES
+        )
+        return ActivityLog.objects.filter(
+            action="auth.login_failed",
+            ip_address=getattr(self.request, "client_ip", None),
+            created_at__gte=window_start,
+        ).count()
+
+    def post(self, request, *args, **kwargs):
+        if self._recent_failures() >= settings.LOGIN_MAX_ATTEMPTS:
+            form = self.get_form()
+            form.add_error(
+                None,
+                "Too many failed sign-in attempts. Please wait a few minutes and try again.",
+            )
+            log_activity("auth.login_throttled", "Login rate limit reached", request=request)
+            return self.render_to_response(
+                self.get_context_data(form=form), status=429
+            )
+        return super().post(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        # Record the failed attempt (never the credentials) for throttling.
+        log_activity("auth.login_failed", "Failed sign-in attempt", request=self.request)
+        return super().form_invalid(form)
 
 
 @customer_required

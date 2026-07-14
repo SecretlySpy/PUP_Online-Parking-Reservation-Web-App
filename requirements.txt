@@ -7,3 +7,4 @@ qrcode[pil]==8.2        # QR generation for reservation verification
 Pillow==12.3.0          # image backend for qrcode
 requests==2.34.2        # PayMongo REST calls
 whitenoise==6.11.0      # compressed, fingerprinted static assets in production
+reportlab==5.0.0        # server-side PDF receipt generation

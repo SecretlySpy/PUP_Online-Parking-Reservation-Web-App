@@ -144,6 +144,14 @@ ADMIN_SIGNUP_CODE = env("ADMIN_SIGNUP_CODE", default="")
 ADMIN_SIGNUP_MAX_ATTEMPTS = env.int("ADMIN_SIGNUP_MAX_ATTEMPTS", default=5)
 ADMIN_SIGNUP_WINDOW_MINUTES = env.int("ADMIN_SIGNUP_WINDOW_MINUTES", default=15)
 
+# Failed sign-in attempts per source IP are counted in the audit table and
+# blocked once they exceed the limit within the rolling window.
+LOGIN_MAX_ATTEMPTS = env.int("LOGIN_MAX_ATTEMPTS", default=10)
+LOGIN_ATTEMPT_WINDOW_MINUTES = env.int("LOGIN_ATTEMPT_WINDOW_MINUTES", default=15)
+
+# How long a customer email-verification link stays valid (seconds; 3 days).
+EMAIL_VERIFICATION_MAX_AGE = env.int("EMAIL_VERIFICATION_MAX_AGE", default=259200)
+
 
 # --- Internationalization ---------------------------------------------------
 LANGUAGE_CODE = "en-us"
@@ -218,6 +226,9 @@ RESERVATION_PAYMENT_GRACE_MINUTES = env.int(
 RESERVATION_ARRIVAL_GRACE_MINUTES = env.int(
     "RESERVATION_ARRIVAL_GRACE_MINUTES", default=15
 )
+# Paid reservations receive one reminder email this many minutes before start.
+# A zero/empty value disables reminders.
+RESERVATION_REMINDER_MINUTES = env.int("RESERVATION_REMINDER_MINUTES", default=30)
 
 
 # --- Site / branding --------------------------------------------------------

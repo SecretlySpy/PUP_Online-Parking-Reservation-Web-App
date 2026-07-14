@@ -41,6 +41,9 @@ class Reservation(models.Model):
     # Preserve the quoted fee in centavos so later configuration changes do not
     # alter the amount owed for an existing reservation.
     fee_cents = models.PositiveIntegerField(default=0)
+    # Stamped once when the pre-arrival reminder email is sent, so the scheduler
+    # never reminds the same paid booking twice.
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

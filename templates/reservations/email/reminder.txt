@@ -1,0 +1,14 @@
+Hi {{ reservation.customer.get_full_name|default:reservation.customer.username }},
+
+This is a friendly reminder that your parking reservation is starting soon.
+
+  Reservation code : {{ reservation.code }}
+  Slot             : {{ reservation.slot.code }} ({{ reservation.slot.floor.name }})
+  Starts           : {{ reservation.start_at|date:"M j, Y H:i" }}
+  Ends             : {{ reservation.end_at|date:"M j, Y H:i" }}
+
+Present your QR code on arrival for verification. You can view it here:
+  {{ base_url }}{% url 'reservations:detail' reservation.pk %}
+
+See you soon,
+{{ site_name }}

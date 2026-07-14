@@ -35,6 +35,15 @@ def send_reservation_created_email(reservation):
     )
 
 
+def send_reservation_reminder_email(reservation):
+    """Remind the customer that a paid reservation starts soon."""
+    _send_reservation_email(
+        reservation=reservation,
+        subject=f"Upcoming parking reservation — {reservation.code}",
+        template_name="reservations/email/reminder.txt",
+    )
+
+
 def send_cancellation_email(reservation, *, cancelled_by):
     """Send a durable cancellation notice, including paid-booking guidance."""
     payment = getattr(reservation, "payment", None)

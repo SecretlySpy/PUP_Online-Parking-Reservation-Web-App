@@ -2,41 +2,45 @@
 {% block title %}Reservation Manager · {{ SITE_SHORT_NAME }}{% endblock %}
 
 {% block content %}
-<div class="card"><h1 style="margin:0">Reservation manager</h1></div>
+<div class="card page-header">
+  <h1>Reservation manager</h1>
+  <a class="btn btn--sm" href="?export=csv{% if current_status %}&status={{ current_status }}{% endif %}{% if current_floor %}&floor={{ current_floor }}{% endif %}">Export CSV</a>
+</div>
 {% include "dashboard/_nav.html" %}
 
 <div class="card">
   <form method="get" class="filter-bar">
     <div class="filter-bar__field">
-      <label>Status</label>
-      <select name="status" class="form-input" onchange="this.form.submit()">
+      <label for="res-status">Status</label>
+      <select name="status" id="res-status" class="form-input">
         <option value="">All statuses</option>
         {% for val, label in statuses %}<option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </div>
     <div class="filter-bar__field">
-      <label>Floor</label>
-      <select name="floor" class="form-input" onchange="this.form.submit()">
+      <label for="res-floor">Floor</label>
+      <select name="floor" id="res-floor" class="form-input">
         <option value="">All floors</option>
         {% for f in floors %}<option value="{{ f.pk }}" {% if current_floor == f.pk|stringformat:'s' %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
       </select>
     </div>
+    <div class="filter-bar__actions"><button class="btn btn--sm">Apply</button></div>
   </form>
 </div>
 
 <div class="card">
   <div class="table-wrap">
-    <table class="data">
+    <table class="data table--stack">
       <thead><tr><th>Code</th><th>Customer</th><th>Slot</th><th>When</th><th>Status</th><th>Set status</th></tr></thead>
       <tbody>
         {% for r in reservations %}
         <tr>
-          <td><a href="{% url 'reservations:detail' r.pk %}">{{ r.code }}</a></td>
-          <td>{{ r.customer.get_full_name|default:r.customer.username }}</td>
-          <td>{{ r.slot.code }} ({{ r.slot.floor.code }})</td>
-          <td>{{ r.start_at|date:"M j, H:i" }}–{{ r.end_at|date:"H:i" }}</td>
-          <td><span class="badge badge--{{ r.status_badge }}">{{ r.get_status_display }}</span></td>
-          <td>
+          <td data-label="Code"><a href="{% url 'reservations:detail' r.pk %}">{{ r.code }}</a></td>
+          <td data-label="Customer">{{ r.customer.get_full_name|default:r.customer.username }}</td>
+          <td data-label="Slot">{{ r.slot.code }} ({{ r.slot.floor.code }})</td>
+          <td data-label="When">{{ r.start_at|date:"M j, H:i" }}–{{ r.end_at|date:"H:i" }}</td>
+          <td data-label="Status"><span class="badge badge--{{ r.status_badge }}">{{ r.get_status_display }}</span></td>
+          <td data-label="Set status">
             <form method="post" action="{% url 'dashboard:reservation_status' r.pk %}" style="display:flex;gap:.3rem">
               {% csrf_token %}
               {% if r.allowed_transitions %}

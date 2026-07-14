@@ -28,4 +28,5 @@ urlpatterns = [
         name="customer_toggle_active",
     ),
     path("reports/", views.reports, name="reports"),
+    path("activity/", views.activity_log, name="activity_log"),
 ]

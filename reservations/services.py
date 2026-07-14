@@ -250,6 +250,7 @@ def transition_reservation(
             f"{reservation.code}: {old_status}→{new_status}",
             actor=actor,
             request=request,
+            target_user=reservation.customer,
         )
 
         if new_status == ReservationStatus.CANCELLED:
@@ -263,6 +264,7 @@ def transition_reservation(
                     f"{reservation.code} · payment {payment.pk}",
                     actor=actor,
                     request=request,
+                    target_user=reservation.customer,
                 )
             cancelled_by = str(actor) if actor else "the system"
             transaction.on_commit(

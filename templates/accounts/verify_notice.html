@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Verify your email · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card card--narrow center">
+  <h1 class="card__title">Verify your email</h1>
+  <p class="muted">
+    We sent a verification link to <strong>{{ user.email }}</strong>. Open it to
+    confirm your address and unlock slot booking.
+  </p>
+  <form method="post" action="{% url 'accounts:resend_verification' %}">
+    {% csrf_token %}
+    <div class="form-actions" style="justify-content:center">
+      <button type="submit" class="btn">Resend verification email</button>
+      <a class="btn btn--ghost" href="{% url 'core:home' %}">Back to home</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

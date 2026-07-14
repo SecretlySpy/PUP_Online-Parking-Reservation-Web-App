@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 from core.constants import VehicleType
 
@@ -64,3 +65,24 @@ class Slot(models.Model):
 
     def accommodates(self, vehicle_type):
         return self.slot_type == vehicle_type
+
+
+class OccupancySnapshot(models.Model):
+    """A point-in-time capture of facility occupancy + revenue for trend charts.
+
+    Written periodically by the ``capture_occupancy_snapshot`` command so the
+    reports page can plot history (all other dashboard stats are instantaneous).
+    """
+
+    captured_at = models.DateTimeField(default=timezone.now, db_index=True)
+    total = models.PositiveIntegerField()
+    available = models.PositiveIntegerField()
+    occupied = models.PositiveIntegerField()
+    maintenance = models.PositiveIntegerField()
+    paid_revenue_cents = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-captured_at"]
+
+    def __str__(self):
+        return f"{self.captured_at:%Y-%m-%d %H:%M} · {self.occupied}/{self.total} occupied"

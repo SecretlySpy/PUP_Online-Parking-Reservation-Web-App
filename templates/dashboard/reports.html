@@ -2,7 +2,10 @@
 {% block title %}Reports · {{ SITE_SHORT_NAME }}{% endblock %}
 
 {% block content %}
-<div class="card"><h1 style="margin:0">Reports</h1></div>
+<div class="card page-header">
+  <h1>Reports</h1>
+  <a class="btn btn--sm" href="?export=csv">Export slots-by-floor CSV</a>
+</div>
 {% include "dashboard/_nav.html" %}
 
 <div class="stat-row">
@@ -10,6 +13,21 @@
   <div class="stat"><div class="stat__num">{{ slots.available_now }}</div><div class="stat__label">Available now</div></div>
   <div class="stat"><div class="stat__num">{{ slots.occupied_now }}</div><div class="stat__label">Reserved / occupied now</div></div>
   <div class="stat"><div class="stat__num">{{ revenue_display }}</div><div class="stat__label">Revenue (paid)</div></div>
+</div>
+
+<div class="grid grid--2">
+  <div class="card">
+    <h3>Occupancy trend <span class="muted" style="font-weight:400;font-size:.8rem">(last 48h)</span></h3>
+    {% if has_occupancy_series %}
+      {{ occupancy_chart }}
+    {% else %}
+      <p class="muted center" style="padding:1.8rem 0">No snapshots yet — run <code>manage.py capture_occupancy_snapshot</code> (e.g. every 15 min) to start collecting the trend.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h3>Reservation status mix</h3>
+    {{ status_chart }}
+  </div>
 </div>
 
 <div class="card">

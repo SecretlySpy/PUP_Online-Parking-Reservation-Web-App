@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}My Activity · {{ SITE_SHORT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1 style="margin:0">My activity</h1>
+  <p class="muted" style="margin:.3rem 0 0">A timeline of events on your bookings, payments, and account.</p>
+</div>
+
+<div class="card">
+  {% if entries %}
+  <div class="table-wrap">
+    <table class="data table--stack">
+      <thead><tr><th>When</th><th>Event</th><th>Details</th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td data-label="When">{{ e.created_at|date:"M j, Y H:i" }}</td>
+          <td data-label="Event"><code>{{ e.action }}</code></td>
+          <td data-label="Details">{{ e.description|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "dashboard/_pagination.html" with page_obj=page_obj page_parameter="page" retained_query="" label="events" %}
+  {% else %}
+  <p class="muted center">No activity yet. Your bookings and payments will appear here.</p>
+  {% endif %}
+</div>
+{% endblock %}

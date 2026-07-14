@@ -151,6 +151,7 @@ def mark_paid(
             # explicitly so the financial audit trail names the real actor.
             actor=actor or reservation.customer,
             request=request,
+            target_user=reservation.customer,
         )
         if should_notify:
             transaction.on_commit(
@@ -192,6 +193,7 @@ def mark_failed(payment, *, actor=None, request=None):
                 locked.reference,
                 actor=actor or reservation.customer,
                 request=request,
+                target_user=reservation.customer,
             )
         if should_notify:
             transaction.on_commit(lambda: send_payment_failed_email(locked))
@@ -202,7 +204,11 @@ def mark_pending(payment, *, actor=None, request=None):
     """Reopen a failed payment without ever downgrading a completed payment."""
     with transaction.atomic():
         payment_ref = Payment.objects.only("reservation_id").get(pk=payment.pk)
-        Reservation.objects.select_for_update().get(pk=payment_ref.reservation_id)
+        reservation = (
+            Reservation.objects.select_for_update()
+            .select_related("customer")
+            .get(pk=payment_ref.reservation_id)
+        )
         locked = Payment.objects.select_for_update().get(pk=payment.pk)
         if locked.status == PaymentStatus.PAID:
             raise PaymentTransitionError("A paid transaction cannot be reopened.")
@@ -214,6 +220,7 @@ def mark_pending(payment, *, actor=None, request=None):
             locked.reference,
             actor=actor,
             request=request,
+            target_user=reservation.customer,
         )
         return locked
 

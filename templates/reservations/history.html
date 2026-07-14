@@ -12,16 +12,20 @@
 {% if reservations %}
 <div class="card">
   <div class="table-wrap">
-    <table class="data">
-      <thead><tr><th>Code</th><th>Slot</th><th>When</th><th>Status</th><th></th></tr></thead>
+    <table class="data table--stack">
+      <thead><tr><th>Code</th><th>Slot</th><th>When</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
         {% for r in reservations %}
         <tr>
-          <td><strong>{{ r.code }}</strong></td>
-          <td>{{ r.slot.code }} ({{ r.slot.floor.code }})</td>
-          <td>{{ r.start_at|date:"M j, H:i" }}–{{ r.end_at|date:"H:i" }}</td>
-          <td><span class="badge badge--{{ r.status_badge }}">{{ r.get_status_display }}</span></td>
-          <td><a href="{% url 'reservations:detail' r.pk %}">View</a></td>
+          <td data-label="Code"><strong>{{ r.code }}</strong></td>
+          <td data-label="Slot">{{ r.slot.code }} ({{ r.slot.floor.code }})</td>
+          <td data-label="When">{{ r.start_at|date:"M j, H:i" }}–{{ r.end_at|date:"H:i" }}</td>
+          <td data-label="Status"><span class="badge badge--{{ r.status_badge }}">{{ r.get_status_display }}</span></td>
+          <td data-label="Actions" style="white-space:nowrap">
+            <a href="{% url 'reservations:detail' r.pk %}">View</a>
+            &middot;
+            <a href="{% url 'reservations:create' r.slot.pk %}{% if r.vehicle_id %}?vehicle={{ r.vehicle_id }}{% endif %}">Rebook</a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

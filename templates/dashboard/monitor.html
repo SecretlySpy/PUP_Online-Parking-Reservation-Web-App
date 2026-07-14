@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Live Monitor · {{ SITE_SHORT_NAME }}{% endblock %}
 
 {% block content %}
@@ -8,15 +9,15 @@
 <div class="card">
   <form id="monitor-filters" class="filter-bar" method="get">
     <div class="filter-bar__field">
-      <label>Floor</label>
-      <select name="floor" class="form-input">
+      <label for="monitor-floor">Floor</label>
+      <select name="floor" id="monitor-floor" class="form-input">
         <option value="">All floors</option>
         {% for f in floors %}<option value="{{ f.pk }}" {% if current_floor == f.pk|stringformat:'s' %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
       </select>
     </div>
     <div class="filter-bar__field">
-      <label>Type</label>
-      <select name="vehicle_type" class="form-input">
+      <label for="monitor-type">Type</label>
+      <select name="vehicle_type" id="monitor-type" class="form-input">
         <option value="">All types</option>
         {% for val, label in vehicle_types %}<option value="{{ val }}" {% if current_type == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
@@ -26,28 +27,15 @@
 </div>
 
 <div class="card">
-  <div id="monitor-grid" data-endpoint="{% url 'dashboard:monitor_partial' %}">
+  <div class="poll-status" data-poll-status-for="monitor-grid" aria-live="polite"></div>
+  <div id="monitor-grid" class="live-poll"
+       data-poll-endpoint="{% url 'dashboard:monitor_partial' %}"
+       data-poll-form="monitor-filters" data-poll-interval="10000">
     {% include "dashboard/_monitor_grid.html" %}
   </div>
 </div>
 {% endblock %}
 
 {% block body_extra %}
-<script>
-(function () {
-  var container = document.getElementById('monitor-grid');
-  var form = document.getElementById('monitor-filters');
-  var endpoint = container.dataset.endpoint;
-  function qs() { return new URLSearchParams(new FormData(form)).toString(); }
-  async function refresh() {
-    try {
-      var r = await fetch(endpoint + '?' + qs());
-      if (r.ok) container.innerHTML = await r.text();
-    } catch (e) {}
-  }
-  form.addEventListener('change', refresh);
-  form.addEventListener('submit', function (e) { e.preventDefault(); refresh(); });
-  setInterval(refresh, 10000);  // live auto-refresh
-})();
-</script>
+<script src="{% static 'js/live-poll.js' %}" defer></script>
 {% endblock %}

@@ -19,6 +19,46 @@
   --err-bg: #fbe9e8;
   --radius: 12px;
   --shadow: 0 1px 3px rgba(0, 0, 0, .08), 0 6px 24px rgba(0, 0, 0, .04);
+  /* Themeable surfaces (light defaults). Dark mode overrides these below so a
+     handful of appended rules can re-point every component background. */
+  --surface: #ffffff;      /* cards, inputs, table body, slot cells */
+  --surface-2: #faf7f2;    /* table headers, subtle fills, hovers */
+  --info: #1a4b8c;
+  --info-bg: #e8f0fe;
+  --focus: var(--gold);
+}
+
+/* Explicit light theme (when the viewer forces light via the toggle). */
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Dark theme: applied by prefers-color-scheme OR the [data-theme] toggle. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink: #e7e9ee;
+    --muted: #9aa3b2;
+    --line: #2b3140;
+    --bg: #14171d;
+    --card: #1b1f27;
+    --surface: #1b1f27;
+    --surface-2: #232833;
+    --ok-bg: #10281a; --warn-bg: #2c2410; --err-bg: #2e1717; --info-bg: #16233b;
+    --ok: #4ade80; --warn: #fbbf24; --err: #f87171; --info: #93c5fd;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .4), 0 6px 24px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e7e9ee;
+  --muted: #9aa3b2;
+  --line: #2b3140;
+  --bg: #14171d;
+  --card: #1b1f27;
+  --surface: #1b1f27;
+  --surface-2: #232833;
+  --ok-bg: #10281a; --warn-bg: #2c2410; --err-bg: #2e1717; --info-bg: #16233b;
+  --ok: #4ade80; --warn: #fbbf24; --err: #f87171; --info: #93c5fd;
+  --shadow: 0 1px 3px rgba(0, 0, 0, .4), 0 6px 24px rgba(0, 0, 0, .3);
 }
 
 * { box-sizing: border-box; }
@@ -250,3 +290,116 @@ table.data th { background: #faf7f2; font-size: .82rem; text-transform: uppercas
 }
 .stat__num { font-size: 1.9rem; font-weight: 800; line-height: 1.1; color: var(--maroon); }
 .stat__label { color: var(--muted); font-size: .82rem; margin-top: .2rem; }
+
+/* ============================================================================
+   Enhancement layer: theme tokens re-point, a11y, mobile nav, toasts,
+   responsive tables, and breakpoints. Rules here intentionally come last so
+   they override the literal light-mode backgrounds above via source order.
+   ========================================================================== */
+
+/* --- Re-point component surfaces to themeable tokens --- */
+.card, table.data, .slot-cell, .dash-nav, .stat, .facility-card,
+.form-input, input, select, textarea { background: var(--surface); color: var(--ink); }
+table.data th, .dash-nav a:hover, .btn--ghost:hover { background: var(--surface-2); }
+.dash-nav a, .btn--ghost { color: var(--ink); }
+.chip { background: var(--surface-2); color: var(--ink); }
+.chip--info, .badge--reserved { background: var(--info-bg); color: var(--info); }
+.chip--danger { background: var(--err-bg); color: var(--err); }
+.badge--completed, .badge--cancelled { background: var(--surface-2); color: var(--muted); }
+.alert--info { background: var(--info-bg); color: var(--info); border-color: transparent; }
+.slot-cell--open, .slot-cell--available { background: var(--ok-bg); }
+.slot-cell--taken, .slot-cell--occupied { background: var(--err-bg); }
+.slot-cell--maint, .slot-cell--maintenance { background: var(--warn-bg); }
+.slot-cell--reserved { background: var(--info-bg); }
+
+/* --- Accessibility: skip link + visible focus + hit areas --- */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--gold); color: var(--maroon-dark);
+  padding: .5rem .9rem; border-radius: 0 0 8px 0; font-weight: 700;
+}
+.skip-link:focus { left: 0; }
+a:focus-visible, button:focus-visible, .btn:focus-visible,
+.link-button:focus-visible, input:focus-visible, select:focus-visible,
+.nav a:focus-visible, .nav-toggle:focus-visible, .theme-toggle:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 2px;
+}
+.nav a { padding: .25rem .15rem; border-radius: 6px; }
+
+/* --- Top-bar controls (hamburger + theme toggle) --- */
+.topbar__controls { display: flex; align-items: center; gap: .5rem; }
+.nav-toggle, .theme-toggle {
+  background: none; border: 1px solid rgba(255, 255, 255, .45); color: #fff;
+  border-radius: 8px; cursor: pointer; line-height: 1; padding: .4rem .55rem; font-size: 1.05rem;
+}
+.nav-toggle { display: none; }
+.theme-toggle:hover, .nav-toggle:hover { background: rgba(255, 255, 255, .14); }
+
+/* --- Page header utility (replaces repeated inline flex) --- */
+.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .6rem; }
+.page-header h1 { margin: 0; }
+
+/* --- Toast notifications (Django messages) --- */
+.messages {
+  position: fixed; bottom: 1rem; right: 1rem; left: auto; top: auto;
+  width: min(360px, calc(100vw - 2rem)); max-width: none; margin: 0; padding: 0;
+  z-index: 60; display: flex; flex-direction: column; gap: .5rem;
+}
+.alert { display: flex; align-items: flex-start; gap: .6rem; box-shadow: var(--shadow); }
+.alert__msg { flex: 1; }
+.alert__close {
+  background: none; border: 0; cursor: pointer; color: inherit;
+  font-size: 1.15rem; line-height: 1; padding: 0; opacity: .6;
+}
+.alert__close:hover { opacity: 1; }
+.alert.is-hiding { opacity: 0; transform: translateX(12px); transition: opacity .3s ease, transform .3s ease; }
+.alert--debug { background: var(--surface-2); color: var(--muted); border-color: var(--line); }
+
+/* --- Live-poll status indicator --- */
+.poll-status { font-size: .78rem; color: var(--muted); }
+.poll-status--error { color: var(--err); }
+
+/* --- Responsive table: stack into key/value cards on small screens --- */
+@media (max-width: 700px) {
+  .table--stack thead { position: absolute; left: -9999px; }
+  .table--stack tr { display: block; border: 1px solid var(--line); border-radius: 10px; margin-bottom: .6rem; }
+  .table--stack td {
+    display: flex; justify-content: space-between; gap: 1rem;
+    border: 0; border-bottom: 1px solid var(--line); padding: .5rem .7rem; text-align: right;
+  }
+  .table--stack tr td:last-child { border-bottom: 0; }
+  .table--stack td::before { content: attr(data-label); font-weight: 700; color: var(--muted); text-align: left; }
+  .table--stack td:empty { display: none; }
+}
+
+/* --- Breakpoints --- */
+@media (max-width: 768px) {
+  .nav-toggle { display: inline-flex; align-items: center; }
+  .nav {
+    display: none; flex-basis: 100%; flex-direction: column;
+    align-items: stretch; gap: .2rem; padding-top: .5rem;
+  }
+  .nav.is-open { display: flex; }
+  .nav a, .nav .link-button { width: 100%; text-align: left; padding: .6rem .5rem; border-radius: 8px; }
+  .nav a:hover, .nav .link-button:hover { background: rgba(255, 255, 255, .12); }
+  .nav__logout { width: 100%; }
+  .nav .btn { text-align: center; }
+  .filter-bar__field { flex: 1 1 45%; }
+  .filter-bar__field select, .filter-bar__field input { min-width: 0; width: 100%; }
+}
+@media (max-width: 560px) {
+  .hero { padding: 1.8rem 1.1rem; }
+  .hero h1 { font-size: 1.5rem; }
+  .container { margin: 1rem auto; }
+  .card { padding: 1.1rem; }
+  .filter-bar__field { flex: 1 1 100%; }
+  .form-actions { flex-direction: column; align-items: stretch; }
+  .form-actions .btn, .form-actions .btn--ghost { width: 100%; }
+  .stat__num { font-size: 1.5rem; }
+  .messages { width: calc(100vw - 1.2rem); right: .6rem; bottom: .6rem; }
+}
+
+/* --- Respect reduced-motion preference --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

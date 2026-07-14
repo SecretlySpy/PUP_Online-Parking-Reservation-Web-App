@@ -9,15 +9,16 @@
   </div>
   <p class="muted">{{ SITE_NAME }}</p>
   <table class="data" style="margin-top:1rem">
-    <tr><th>Reference</th><td>{{ payment.reference }}</td></tr>
-    <tr><th>Reservation</th><td>{{ payment.reservation.code }}</td></tr>
-    <tr><th>Slot</th><td>{{ payment.reservation.slot.code }} ({{ payment.reservation.slot.floor.name }})</td></tr>
-    <tr><th>When</th><td>{{ payment.reservation.start_at|date:"M j, Y H:i" }}–{{ payment.reservation.end_at|date:"H:i" }}</td></tr>
-    <tr><th>Method</th><td>{{ payment.method|default:"—"|upper }}</td></tr>
-    <tr><th>Paid at</th><td>{{ payment.paid_at|date:"M j, Y H:i" }}</td></tr>
-    <tr><th>Amount</th><td style="font-weight:800">{{ payment.amount_display }}</td></tr>
+    <tr><th scope="row">Reference</th><td>{{ payment.reference }}</td></tr>
+    <tr><th scope="row">Reservation</th><td>{{ payment.reservation.code }}</td></tr>
+    <tr><th scope="row">Slot</th><td>{{ payment.reservation.slot.code }} ({{ payment.reservation.slot.floor.name }})</td></tr>
+    <tr><th scope="row">When</th><td>{{ payment.reservation.start_at|date:"M j, Y H:i" }}–{{ payment.reservation.end_at|date:"H:i" }}</td></tr>
+    <tr><th scope="row">Method</th><td>{{ payment.method|default:"—"|upper }}</td></tr>
+    <tr><th scope="row">Paid at</th><td>{{ payment.paid_at|date:"M j, Y H:i" }}</td></tr>
+    <tr><th scope="row">Amount</th><td style="font-weight:800">{{ payment.amount_display }}</td></tr>
   </table>
   <div class="form-actions">
+    <a class="btn" href="{% url 'payments:receipt_pdf' payment.pk %}">Download PDF</a>
     <a class="btn btn--ghost" href="{% url 'reservations:detail' payment.reservation.pk %}">Back to reservation</a>
   </div>
 </div>

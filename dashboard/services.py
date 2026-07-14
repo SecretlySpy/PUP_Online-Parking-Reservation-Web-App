@@ -4,11 +4,13 @@ Every function returns plain dicts/lists (no side effects) built with ORM
 aggregates, so views stay thin and the numbers are easy to unit-test.
 """
 
+from datetime import timedelta
+
 from django.db.models import Count, Sum
 from django.utils import timezone
 
 from core.models import ActivityLog
-from parking.models import Floor, Slot, SlotStatus
+from parking.models import Floor, OccupancySnapshot, Slot, SlotStatus
 from payments.models import Payment, PaymentStatus
 from reservations.models import ACTIVE_STATUSES, Reservation, ReservationStatus
 
@@ -121,6 +123,22 @@ def monitor_slots(floor=None, vehicle_type=None):
             slot.monitor_status = "available"
         slots.append(slot)
     return slots
+
+
+def occupancy_series(hours=48):
+    """Return recent occupancy snapshots (oldest first) for the trend chart."""
+    since = timezone.now() - timedelta(hours=hours)
+    return [
+        {
+            "captured_at": snap.captured_at,
+            "occupied": snap.occupied,
+            "available": snap.available,
+            "total": snap.total,
+        }
+        for snap in OccupancySnapshot.objects.filter(captured_at__gte=since).order_by(
+            "captured_at"
+        )
+    ]
 
 
 def recent_activity(limit=15):

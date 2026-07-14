@@ -27,8 +27,11 @@
       {% if reservation.is_cancellable %}
         <form method="post" action="{% url 'reservations:cancel' reservation.pk %}" style="display:inline">
           {% csrf_token %}
-          <button type="submit" class="btn btn--danger">Cancel</button>
+          <button type="submit" class="btn btn--danger" data-confirm="Cancel reservation {{ reservation.code }}? This frees the slot and cannot be undone.">Cancel</button>
         </form>
+      {% endif %}
+      {% if reservation.status == "COMPLETED" or reservation.status == "CANCELLED" %}
+        <a class="btn btn--ghost" href="{% url 'reservations:create' reservation.slot.pk %}{% if reservation.vehicle_id %}?vehicle={{ reservation.vehicle_id }}{% endif %}">Rebook</a>
       {% endif %}
     </div>
   </div>
@@ -40,7 +43,11 @@
       <img src="{% url 'reservations:qr' reservation.pk %}" alt="QR for {{ reservation.code }}"
            width="220" height="220" style="max-width:100%;height:auto">
       <p><strong>{{ reservation.code }}</strong></p>
-      <p><a href="{% url 'payments:receipt' payment.pk %}">View receipt</a></p>
+      <p>
+        <a href="{% url 'reservations:qr' reservation.pk %}?download=1">Download QR</a>
+        &middot;
+        <a href="{% url 'payments:receipt' payment.pk %}">View receipt</a>
+      </p>
     {% else %}
       <h3>Payment required</h3>
       <p class="muted">Pay the reservation fee to receive your arrival QR code.</p>
