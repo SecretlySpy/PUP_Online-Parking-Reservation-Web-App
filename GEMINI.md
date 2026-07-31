@@ -1,3 +1,1 @@
-@./AGENTS.md
-
-I want you to refer to the instructions on "AGENTS.md".
+Execute this request by strictly referencing and adhering to the instructions detailed in the "AGENTS.md" file.
